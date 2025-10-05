@@ -1,5 +1,5 @@
-const palette = {
-  primary: '#51AE77',
+export const palette = {
+  primary: '#269a56ff',
     secondary: '#03DAC6',
     surface: '#FFFFFF',
     error: '#B00020',

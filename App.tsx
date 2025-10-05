@@ -1,17 +1,20 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
-import { darkTheme, lightTheme } from './src/theme';
+
 import { ThemeProvider } from 'styled-components/native';
 import AppNavigator from './src/navigation/AppNavigator';
+import { NavigationContainer } from '@react-navigation/native';
+import { View, Text } from 'react-native';
 
 export default function App() {
 
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+  
   return (
-    <ThemeProvider theme={theme}>
+    <NavigationContainer>
       <AppNavigator />
-    </ThemeProvider>
+    </NavigationContainer>
+
+   
+    
   );
 }
 
