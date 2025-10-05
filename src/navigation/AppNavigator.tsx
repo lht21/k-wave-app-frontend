@@ -1,6 +1,16 @@
-import React from 'react'
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { HugeiconsIcon } from '@hugeicons/react-native'; // 1. Import component chính
+
+// 2. Import TỪNG icon bạn cần sử dụng (stroke và solid)
+import {
+  Home01Icon,
+  NewsIcon,
+  Image01Icon,
+  BookIcon,
+  Settings02Icon,
+  CircleIcon // Icon mặc định
+} from '@hugeicons/core-free-icons';
 
 import NewsScreen from '../screens/News/NewsScreen';
 import LearnImageScreen from '../screens/LearnImage/LearnImageScreen';
@@ -9,46 +19,46 @@ import SettingScreen from '../screens/Setting/SettingScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
 import { palette } from '../theme/colors';
 
-
-
 const Tab = createBottomTabNavigator();
 
 const AppNavigator = () => {
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          const name = (() => {
+          // 3. Thay đổi logic: switch/case sẽ trả về đối tượng icon thay vì string
+          const icon = (() => {
             switch (route.name) {
               case 'Home':
-                return focused ? 'home' : 'home-outline';
+                return focused ? Home01Icon : Home01Icon;
               case 'News':
-                return focused ? 'newspaper' : 'newspaper-outline';
+                return focused ? NewsIcon : NewsIcon;
               case 'LearnImage':
-                return focused ? 'image' : 'image-outline';
+                return focused ? Image01Icon : Image01Icon;
               case 'Roadmap':
-                return focused ? 'book' : 'book-outline';
+                return focused ? BookIcon : BookIcon;
               case 'Setting':
-                return focused ? 'settings' : 'settings-outline';
+                return focused ? Settings02Icon : Settings02Icon;
               default:
-                return 'ellipse';
+                return CircleIcon; // Trả về một icon mặc định đã import
             }
           })();
-          return <Ionicons name={name} size={size} color={color} />;
+
+          // 4. Sử dụng component HugeiconsIcon và truyền đối tượng icon vào prop `icon`
+          return <HugeiconsIcon icon={icon} size={size} color={color} strokeWidth={2} />;
         },
         headerShown: false,
         tabBarActiveTintColor: palette.primary,
         tabBarInactiveTintColor: palette.gray900,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="News" component={NewsScreen} />
-      <Tab.Screen name="LearnImage" component={LearnImageScreen} />
-      <Tab.Screen name="Roadmap" component={RoadmapScreen} />
-      <Tab.Screen name="Setting" component={SettingScreen} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Trang chủ' }} />
+      <Tab.Screen name="News" component={NewsScreen} options={{ tabBarLabel: 'Tin tức' }} />
+      <Tab.Screen name="LearnImage" component={LearnImageScreen} options={{ tabBarLabel: 'Học ảnh' }}/>
+      <Tab.Screen name="Roadmap" component={RoadmapScreen} options={{ tabBarLabel: 'Lộ trình' }} />
+      <Tab.Screen name="Setting" component={SettingScreen} options={{ tabBarLabel: 'Cài đặt' }} />
     </Tab.Navigator>
-  )
-}
+  );
+};
 
-export default AppNavigator
+export default AppNavigator;
