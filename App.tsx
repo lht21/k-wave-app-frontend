@@ -1,20 +1,16 @@
-import { StatusBar } from 'expo-status-bar';
-
-import { ThemeProvider } from 'styled-components/native';
-import AppNavigator from './src/navigation/AppNavigator';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { View, Text } from 'react-native';
+import { AuthProvider } from './src/contexts/AuthContext';
+import AppNavigator from './src/navigation/AppNavigator';
 
-export default function App() {
-
-  
+const App = () => {
   return (
-    <NavigationContainer>
-      <AppNavigator />
-    </NavigationContainer>
-
-   
-    
+    <AuthProvider>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
-}
+};
 
+export default App;
