@@ -30,8 +30,13 @@ export const colors = {
         success: palette.success,
         error: palette.error,
         warning: palette.warning,
-        border: palette.gray100 
-    
+        border: palette.gray100,
+        
+        gray900: palette.gray900,
+        gray100: palette.gray100,
+        gray500: palette.gray500,  
+        white: palette.white,   
+        black: palette.black,
     },
     dark: {
         primary: palette.primary,

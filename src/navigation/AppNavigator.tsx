@@ -1,15 +1,15 @@
+// src/navigation/AppNavigator.tsx (Student Navigator)
 import React from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { HugeiconsIcon } from '@hugeicons/react-native'; // 1. Import component chính
-
-// 2. Import TỪNG icon bạn cần sử dụng (stroke và solid)
+import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   Home01Icon,
   NewsIcon,
   Image01Icon,
   BookIcon,
   Settings02Icon,
-  CircleIcon // Icon mặc định
+  CircleIcon
 } from '@hugeicons/core-free-icons';
 
 import NewsScreen from '../screens/News/NewsScreen';
@@ -19,14 +19,15 @@ import SettingScreen from '../screens/Setting/SettingScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
 import { palette } from '../theme/colors';
 
+const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const AppNavigator = () => {
+// Tab Navigator cho student
+const StudentTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          // 3. Thay đổi logic: switch/case sẽ trả về đối tượng icon thay vì string
           const icon = (() => {
             switch (route.name) {
               case 'Home':
@@ -40,11 +41,10 @@ const AppNavigator = () => {
               case 'Setting':
                 return focused ? Settings02Icon : Settings02Icon;
               default:
-                return CircleIcon; // Trả về một icon mặc định đã import
+                return CircleIcon;
             }
           })();
 
-          // 4. Sử dụng component HugeiconsIcon và truyền đối tượng icon vào prop `icon`
           return <HugeiconsIcon icon={icon} size={size} color={color} strokeWidth={2} />;
         },
         headerShown: false,
@@ -58,6 +58,19 @@ const AppNavigator = () => {
       <Tab.Screen name="Roadmap" component={RoadmapScreen} options={{ tabBarLabel: 'Lộ trình' }} />
       <Tab.Screen name="Setting" component={SettingScreen} options={{ tabBarLabel: 'Cài đặt' }} />
     </Tab.Navigator>
+  );
+};
+
+// Stack Navigator cho student
+const AppNavigator = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="StudentMain" 
+        component={StudentTabs}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
   );
 };
 
