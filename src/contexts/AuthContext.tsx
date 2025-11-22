@@ -1,23 +1,14 @@
+// contexts/AuthContext.tsx
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/authService';
 
 export interface User {
-  id: string;
+  _id: string;
   username: string;
   email: string;
   fullName: string;
   role: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
-  register: (userData: RegisterCredentials) => Promise<AuthResponse>;
-  logout: () => void;
-  loading: boolean;
-  isAuthenticated: boolean;
 }
 
 interface LoginCredentials {
@@ -32,10 +23,19 @@ interface RegisterCredentials {
   password: string;
   role?: string;
 }
+
 interface AuthResponse {
   token?: string;
   user?: User;
   message?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  register: (userData: RegisterCredentials) => Promise<AuthResponse>;
+  logout: () => Promise<void>;
+  isLoading: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,37 +46,32 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkAuthStatus();
+    checkAuthState();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthState = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('authToken');
-      if (storedToken) {
-        setToken(storedToken);
-        // Có thể fetch user profile ở đây nếu cần
+      const userData = await AsyncStorage.getItem('userData');
+      
+      if (userData) {
+        setUser(JSON.parse(userData));
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('Error checking auth state:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
       const result = await authService.login(credentials);
-      if (result.token) {
-        await AsyncStorage.setItem('authToken', result.token);
-        setToken(result.token);
-        // Set user data if available in response
-        if (result.user) {
-          setUser(result.user);
-        }
+      
+      if (result.token && result.user) {
+        setUser(result.user);
       }
       return result;
     } catch (error) {
@@ -84,7 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (userData: RegisterCredentials) => {
+  const register = async (userData: RegisterCredentials): Promise<AuthResponse> => {
     try {
       const result = await authService.register(userData);
       return result;
@@ -93,24 +88,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
-      await AsyncStorage.removeItem('authToken');
-      setToken(null);
+      await authService.logout();
       setUser(null);
     } catch (error) {
       console.error('Error during logout:', error);
+      throw error;
     }
   };
 
   const value: AuthContextType = {
     user,
-    token,
     login,
     register,
     logout,
-    loading,
-    isAuthenticated: !!token,
+    isLoading,
   };
 
   return (
