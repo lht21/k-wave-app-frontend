@@ -150,7 +150,7 @@ const LessonDetailScreen: React.FC = () => {
       if (foundLesson) {
         setLesson(foundLesson);
       } else {
-        Alert.alert('Lỗi', 'Không tìm thấy bài học');
+        Alert.alert('Xin lỗi', 'Hiện tại bài học này đang không có sẵn. Xin vui lòng thử lại sau.');
         navigation.goBack();
       }
       setLoading(false);

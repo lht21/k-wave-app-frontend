@@ -22,6 +22,7 @@ import { palette } from '../theme/colors';
 
 import LessonDetailScreen from '../screens/Teacher/TeacherLessonsScreen/LessonDetailScreen';
 import TeacherExamsDetail from '../screens/Teacher/TeacherExamsScreen/TeacherExamsDetail';
+import TeacherCultureDetail from '../screens/Teacher/TeacherCultureScreen/TeacherCultureDetail';
 
 type TeacherStackParamList = {
   TeacherMain: undefined;
@@ -124,6 +125,14 @@ const TeacherNavigator = () => {
         component={TeacherExamsDetail}
         options={{ 
           title: 'Chi tiết đề thi',
+          headerBackTitle: 'Quay lại'
+        }}
+      />
+      <Stack.Screen 
+        name="CultureDetail" 
+        component={TeacherCultureDetail}
+        options={{ 
+          title: 'Chi tiết văn hóa',
           headerBackTitle: 'Quay lại'
         }}
       />

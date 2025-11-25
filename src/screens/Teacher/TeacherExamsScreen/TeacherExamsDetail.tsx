@@ -270,7 +270,7 @@ const TeacherExamsDetail: React.FC = () => {
       if (data) {
         setExam(data);
       } else {
-        Alert.alert('Lỗi', 'Không tìm thấy đề thi', [
+        Alert.alert('Xin lỗi', 'Hiện tại đề thi đang không có sẵn. Vui lòng thử lại sau.', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       }
