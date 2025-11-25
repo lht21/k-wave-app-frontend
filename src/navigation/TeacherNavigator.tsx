@@ -21,6 +21,7 @@ import SettingScreen from '../screens/Setting/SettingScreen';
 import { palette } from '../theme/colors';
 
 import LessonDetailScreen from '../screens/Teacher/TeacherLessonsScreen/LessonDetailScreen';
+import TeacherExamsDetail from '../screens/Teacher/TeacherExamsScreen/TeacherExamsDetail';
 
 type TeacherStackParamList = {
   TeacherMain: undefined;
@@ -115,6 +116,14 @@ const TeacherNavigator = () => {
         component={LessonDetailScreen}
         options={{ 
           title: 'Chi tiết Bài học',
+          headerBackTitle: 'Quay lại'
+        }}
+      />
+      <Stack.Screen 
+        name="ExamDetail" 
+        component={TeacherExamsDetail}
+        options={{ 
+          title: 'Chi tiết đề thi',
           headerBackTitle: 'Quay lại'
         }}
       />
