@@ -20,6 +20,13 @@ import TeacherNewsScreen from '../screens/Teacher/TeacherNewsScreen/TeacherNewsS
 import SettingScreen from '../screens/Setting/SettingScreen';
 import { palette } from '../theme/colors';
 
+import LessonDetailScreen from '../screens/Teacher/TeacherLessonsScreen/LessonDetailScreen';
+
+type TeacherStackParamList = {
+  TeacherMain: undefined;
+  LessonDetail: { lessonId: number };
+};
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -103,6 +110,15 @@ const TeacherNavigator = () => {
         component={TeacherTabs}
         options={{ headerShown: false }}
       />
+      <Stack.Screen 
+        name="LessonDetail" 
+        component={LessonDetailScreen}
+        options={{ 
+          title: 'Chi tiết Bài học',
+          headerBackTitle: 'Quay lại'
+        }}
+      />
+
     </Stack.Navigator>
   );
 };
