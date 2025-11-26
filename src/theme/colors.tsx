@@ -1,6 +1,6 @@
 export const palette = {
   primary: '#269a56ff',
-    secondary: '#03DAC6',
+secondary: '#A1BC98' ,// cam nhạt, nổi bật với xanh lá
     surface: '#FFFFFF',
     error: '#B00020',
     onPrimary: '#FFFFFF',
@@ -13,6 +13,9 @@ export const palette = {
     gray500: '#9E9E9E',
     gray100: '#F5F5F5',
 
+    blue: '#2962FF',
+    orange: '#FF5722',
+    purple: '#6200EE',
     white: '#FFFFFF',
     black: '#000000',
     warning: '#FFA000',
@@ -23,6 +26,7 @@ export const palette = {
 export const colors = {
     light: {
         primary: palette.primary,
+        secondary: palette.secondary, 
         background: palette.gray100,
         card: palette.white,
         text: palette.gray900,
