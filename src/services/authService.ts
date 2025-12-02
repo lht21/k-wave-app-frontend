@@ -27,8 +27,8 @@ interface User {
 }
 
 interface AuthResponse {
-  token: string;
-  user?: User;
+  token?: string;
+  user?: any;
   msg?: string;
 }
 
@@ -36,13 +36,20 @@ export const authService = {
   // Đăng ký
   register: async (credentials: RegisterCredentials): Promise<AuthResponse> => {
     try {
+      console.log('📤 Register request:', {
+        url: `${AUTH_URL}/register`,
+        credentials: { ...credentials, password: '***' }
+      });
+
       const response = await fetch(`${AUTH_URL}/register`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(credentials)
       });
 
+      console.log('📥 Register response status:', response.status);
       const result = await response.json();
+      console.log('📥 Register response data:', result);
 
       if (!response.ok) {
         throw new Error(result.msg || 'Đăng ký thất bại');
@@ -50,6 +57,10 @@ export const authService = {
 
       return result;
     } catch (error) {
+      console.error('❌ Register error:', error);
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+      }
       throw error;
     }
   },
