@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useForm, Controller } from 'react-hook-form';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Mail01Icon, SecurityIcon, ViewOffIcon, EyeIcon, GoogleIcon, Facebook02Icon } from '@hugeicons/core-free-icons';
+import { ViewOffIcon, EyeIcon, GoogleIcon, Facebook02Icon } from '@hugeicons/core-free-icons';
 import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -41,22 +41,20 @@ const LoginScreen = () => {
     }
   });
 
-  const handleLogin = async (data: LoginFormData) => {
-    setLoading(true);
-    setMessage(null);
-    try {
-      await login(data);
-      setMessage('Đăng nhập thành công!');
-      setTimeout(() => {
-        navigation.navigate("Main", { screen: "Home" });
-      }, 500);
-    } catch (error: any) {
-      setMessage(error.message || 'Đã xảy ra lỗi khi đăng nhập');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+// Trong LoginScreen.tsx - hàm handleLogin
+const handleLogin = async (data: LoginFormData) => {
+  setLoading(true);
+  setMessage(null);
+  try {
+    await login(data);
+    setMessage('Đăng nhập thành công!');
+    // RootNavigator sẽ tự động điều hướng dựa trên role
+  } catch (error: any) {
+    setMessage(error.message || 'Đã xảy ra lỗi khi đăng nhập');
+  } finally {
+    setLoading(false);
+  }
+};
   const goToSignUp = () => {
     navigation.navigate('SignUp');
   };

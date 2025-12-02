@@ -6,7 +6,7 @@ import { colors, palette } from '../../theme/colors'
 
 type ButtonProps = {
     title: string,
-    variant?: 'primary' | 'outline' | 'danger',
+    variant?: 'primary' | 'outline' | 'danger' | 'secondary',
     size?: 'small' | 'medium' | 'large',
     leftIcon?: React.ReactNode,
     rightIcon?: React.ReactNode,
@@ -66,14 +66,22 @@ const styles = StyleSheet.create({
         color: palette.white
     },
 
-    //outline
+    // ---secondary
+    secondaryContainer: {
+        backgroundColor: colors.light.secondary, 
+    },
+    secondaryText: {
+        color: palette.white, // chữ trắng
+    },
+
+    // ---outline 
     outlineContainer:{
         borderWidth: 1,
         borderColor: colors.light.primary,
         backgroundColor: 'transparent'
     },
     outlineText:{
-        color: colors.light.primary
+        color: colors.light.black, // đổi màu chữ sang đen
     },
 
     //danger
