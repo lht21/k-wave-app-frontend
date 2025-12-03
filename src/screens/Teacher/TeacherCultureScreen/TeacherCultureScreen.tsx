@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Alert,
   FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
   Image,
+  ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -17,8 +18,8 @@ import {
   Delete02Icon,
   ViewIcon,
   StarIcon,
-  BookOpen01Icon,
   PenTool03Icon,
+  BookOpen01Icon,
   Sorting05Icon,
   GlobeIcon,
   MusicNote03Icon,
@@ -35,180 +36,20 @@ import {
   FavouriteIcon
 } from '@hugeicons/core-free-icons';
 
+import { cultureService, Culture } from '../../../services/cultureService'; // Import Service
+import ModalCulture from '../../../components/Modal/ModalCulture';
 import Button from '../../../components/Button/Button';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-import ModalCulture from '../../../components/Modal/ModalCulture';
 
-// --- TYPES ---
-type CultureCategory = 
-  | 'Tất cả' 
-  | 'Âm nhạc' 
-  | 'Ẩm thực' 
-  | 'Du lịch' 
-  | 'Điện ảnh' 
-  | 'Gia đình & Xã hội' 
-  | 'Làm đẹp' 
-  | 'Lễ hội' 
-  | 'Lịch sử' 
-  | 'Trang phục' 
-  | 'Trường học' 
-  | 'Uống rượu' 
-  | 'Ứng xử';
-
-type ContentType = 'text' | 'image';
-
-interface ContentItem {
-  type: ContentType;
-  content: string;
-  url?: string;
-  caption?: string;
-  localImage?: any;
-}
-
-interface VocabularyItem {
-  word: string;
-  meaning: string;
-  pronunciation: string;
-}
-
-interface CultureData {
-  id?: number;
-  title: string;
-  subtitle: string;
-  category: string;
-  image: any;
-  icon: string;
-  content: ContentItem[];
-  vocabulary: VocabularyItem[];
-  isPremium?: boolean;
-  views?: number;
-  likes?: number;
-}
-
-interface CultureItem {
-  id: number;
-  title: string;
-  subtitle: string;
-  category: CultureCategory;
-  isPremium: boolean;
-  views: number;
-  likes: number;
-  image: any;
-  icon: string;
-}
-
-// --- MOCK DATA ---
-const initialCultureData: Record<CultureCategory, CultureItem[]> = {
-  'Tất cả': [
-    { 
-      id: 1, 
-      title: 'Văn hóa Sunbae-Hoobae', 
-      subtitle: 'Mối quan hệ tiền bối - hậu bối trong xã hội Hàn Quốc',
-      category: 'Ứng xử',
-      isPremium: false,
-      views: 1250,
-      likes: 89,
-      image: require('../../../assets/culture/th2.png'),
-      icon: '/flower.png'
-    },
-    { 
-      id: 2, 
-      title: 'Nghệ thuật Kimchi', 
-      subtitle: 'Lịch sử và quy trình làm kimchi truyền thống',
-      category: 'Ẩm thực',
-      isPremium: false,
-      views: 980,
-      likes: 76,
-      image: require('../../../assets/culture/at3.png'),
-      icon: '/flower.png'
-    },
-    { 
-      id: 3, 
-      title: 'Lễ hội Chuseok', 
-      subtitle: 'Tết trung thu truyền thống của Hàn Quốc',
-      category: 'Lễ hội',
-      isPremium: true,
-      views: 750,
-      likes: 64,
-      image: require('../../../assets/culture/lh1.png'),
-      icon: '/flower.png'
-    },
-    { 
-      id: 4, 
-      title: 'Nhạc K-pop Evolution', 
-      subtitle: 'Sự phát triển của âm nhạc đại chúng Hàn Quốc',
-      category: 'Âm nhạc',
-      isPremium: true,
-      views: 2100,
-      likes: 156,
-      image: require('../../../assets/culture/an5.png'),
-      icon: '/flower.png'
-    },
-  ],
-  'Âm nhạc': [
-    { 
-      id: 4, 
-      title: 'Nhạc K-pop Evolution', 
-      subtitle: 'Sự phát triển của âm nhạc đại chúng Hàn Quốc',
-      category: 'Âm nhạc',
-      isPremium: true,
-      views: 2100,
-      likes: 156,
-      image: require('../../../assets/culture/an5.png'),
-      icon: '/flower.png'
-    }
-  ],
-  'Ẩm thực': [
-    { 
-      id: 2, 
-      title: 'Nghệ thuật Kimchi', 
-      subtitle: 'Lịch sử và quy trình làm kimchi truyền thống',
-      category: 'Ẩm thực',
-      isPremium: false,
-      views: 980,
-      likes: 76,
-      image: require('../../../assets/culture/at3.png'),
-      icon: '/flower.png'
-    }
-  ],
-  'Du lịch': [],
-  'Điện ảnh': [],
-  'Gia đình & Xã hội': [],
-  'Làm đẹp': [],
-  'Lễ hội': [
-    { 
-      id: 3, 
-      title: 'Lễ hội Chuseok', 
-      subtitle: 'Tết trung thu truyền thống của Hàn Quốc',
-      category: 'Lễ hội',
-      isPremium: true,
-      views: 750,
-      likes: 64,
-      image: require('../../../assets/culture/lh1.png'),
-      icon: '/flower.png'
-    }
-  ],
-  'Lịch sử': [],
-  'Trang phục': [],
-  'Trường học': [],
-  'Uống rượu': [],
-  'Ứng xử': [
-    { 
-      id: 1, 
-      title: 'Văn hóa Sunbae-Hoobae', 
-      subtitle: 'Mối quan hệ tiền bối - hậu bối trong xã hội Hàn Quốc',
-      category: 'Ứng xử',
-      isPremium: false,
-      views: 1250,
-      likes: 89,
-      image: require('../../../assets/culture/ux1.png'),
-      icon: '/flower.png'
-    }
-  ]
+// Định nghĩa Type cho Navigation
+type TeacherStackParamList = {
+  TeacherCultureScreen: undefined;
+  TeacherCultureDetail: { cultureId: string }; // Dùng string vì MongoDB ID là string
 };
 
-const categories: { id: CultureCategory; label: string; icon: any }[] = [
+// Danh mục và Icon tương ứng
+const categories = [
   { id: 'Tất cả', label: 'Tất cả', icon: GlobeIcon },
   { id: 'Âm nhạc', label: 'Âm nhạc', icon: MusicNote03Icon },
   { id: 'Ẩm thực', label: 'Ẩm thực', icon: FirePitIcon },
@@ -224,175 +65,124 @@ const categories: { id: CultureCategory; label: string; icon: any }[] = [
   { id: 'Ứng xử', label: 'Ứng xử', icon: Agreement01Icon }
 ];
 
-type TeacherStackParamList = {
-  TeacherMain: undefined;
-  CultureDetail: { cultureId: number };
-};
-
 const TeacherCultureScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<TeacherStackParamList>>();
-  const [selectedCategory, setSelectedCategory] = useState<CultureCategory>('Tất cả');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [cultureData, setCultureData] = useState(initialCultureData);
+  
+  // State
+  const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [cultures, setCultures] = useState<Culture[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // Mặc định mới nhất trước
+  
+  // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [selectedCulture, setSelectedCulture] = useState<CultureData | null>(null);
+  const [selectedCulture, setSelectedCulture] = useState<Culture | null>(null);
+
+  // --- API CALLS ---
+  const loadCultures = async () => {
+    setLoading(true);
+    try {
+      // includeDrafts=true để giáo viên thấy cả bài chưa publish (nếu backend hỗ trợ logic này)
+      // Mặc định cultureService.getAll đã handle param này
+      const data = await cultureService.getAll(selectedCategory);
+      
+      // Sắp xếp client-side (hoặc backend nếu muốn)
+      const sortedData = [...data].sort((a, b) => {
+        if (sortOrder === 'asc') return a.title.localeCompare(b.title);
+        // Desc theo ngày tạo (giả sử _id hoặc createdAt, ở đây sort theo title desc cho demo)
+        return b.title.localeCompare(a.title); 
+      });
+
+      setCultures(sortedData);
+    } catch (error) {
+      console.error('Failed to load cultures:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách văn hóa. Kiểm tra kết nối server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tải lại dữ liệu khi màn hình được focus hoặc category thay đổi
+  useFocusEffect(
+    useCallback(() => {
+      loadCultures();
+    }, [selectedCategory, sortOrder])
+  );
 
   // --- HANDLERS ---
-  const handleAddCulture = () => {
-    setModalMode('add');
+  const handleOpenAdd = () => {
     setSelectedCulture(null);
+    setModalMode('add');
     setModalVisible(true);
   };
 
-  const handleEditCulture = (cultureId: number) => {
-    const culture = Object.values(cultureData)
-      .flat()
-      .find(item => item.id === cultureId);
-    
-    if (culture) {
-      // Convert CultureItem to CultureData for the modal
-      const cultureDataForModal: CultureData = {
-        id: culture.id,
-        title: culture.title,
-        subtitle: culture.subtitle,
-        category: culture.category,
-        image: culture.image,
-        icon: culture.icon,
-        content: [{ type: 'text', content: culture.subtitle }],
-        vocabulary: [{ word: 'Ví dụ', meaning: 'Example', pronunciation: '' }],
-        isPremium: culture.isPremium,
-        views: culture.views,
-        likes: culture.likes
-      };
-      
-      setModalMode('edit');
-      setSelectedCulture(cultureDataForModal);
-      setModalVisible(true);
+  const handleOpenEdit = (culture: Culture) => {
+    setSelectedCulture(culture);
+    setModalMode('edit');
+    setModalVisible(true);
+  };
+
+  const handleSave = async (data: Partial<Culture>) => {
+    try {
+      if (modalMode === 'add') {
+        await cultureService.create(data);
+        Alert.alert('Thành công', 'Đã tạo bài văn hóa mới');
+      } else if (selectedCulture?._id) {
+        await cultureService.update(selectedCulture._id, data);
+        Alert.alert('Thành công', 'Đã cập nhật bài văn hóa');
+      }
+      setModalVisible(false);
+      loadCultures(); // Reload list
+    } catch (error: any) {
+      console.error('Save error:', error);
+      Alert.alert('Lỗi', error.message || 'Có lỗi xảy ra khi lưu');
     }
   };
 
-  const handleSaveCulture = (data: CultureData) => {
-    if (modalMode === 'add') {
-      const newId = Date.now();
-      const newCulture: CultureItem = {
-        id: newId,
-        title: data.title,
-        subtitle: data.subtitle,
-        category: data.category as CultureCategory,
-        isPremium: false,
-        views: 0,
-        likes: 0,
-        image: data.image || require('../../../assets/flower.png'),
-        icon: data.icon
-      };
-      
-      setCultureData(prev => ({
-        ...prev,
-        [data.category]: [...(prev[data.category as CultureCategory] || []), newCulture],
-        'Tất cả': [...prev['Tất cả'], newCulture]
-      }));
-      
-      Alert.alert('Thành công', 'Đã thêm bài văn hóa mới');
-    } else {
-      // Update logic for edit mode
-      setCultureData(prev => {
-        const newData = { ...prev };
-        Object.keys(newData).forEach(category => {
-          newData[category as CultureCategory] = newData[category as CultureCategory].map(
-            item => {
-              if (item.id === selectedCulture?.id) {
-                return {
-                  ...item,
-                  title: data.title,
-                  subtitle: data.subtitle,
-                  category: data.category as CultureCategory,
-                  image: data.image,
-                  icon: data.icon
-                };
-              }
-              return item;
-            }
-          );
-        });
-        return newData;
-      });
-      
-      Alert.alert('Thành công', 'Đã cập nhật bài văn hóa');
-    }
-    
-    setModalVisible(false);
-  };
-
-  const handleDeleteCulture = (cultureId: number) => {
-    Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa bài văn hóa này?', [
+  const handleDelete = (id: string) => {
+    Alert.alert('Xác nhận', 'Bạn có chắc muốn xóa bài văn hóa này?', [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
         style: 'destructive',
-        onPress: () => {
-          setCultureData(prev => {
-            const newData = { ...prev };
-            Object.keys(newData).forEach(category => {
-              newData[category as CultureCategory] = newData[category as CultureCategory].filter(
-                item => item.id !== cultureId
-              );
-            });
-            return newData;
-          });
-          Alert.alert('Thành công', 'Đã xóa bài văn hóa thành công!');
+        onPress: async () => {
+          try {
+            await cultureService.delete(id);
+            Alert.alert('Thành công', 'Đã xóa bài văn hóa');
+            loadCultures();
+          } catch (error) {
+            Alert.alert('Lỗi', 'Không thể xóa bài văn hóa');
+          }
         }
       }
     ]);
   };
 
-  const handleTogglePremium = (cultureId: number, currentPremiumStatus: boolean) => {
-    const action = currentPremiumStatus ? 'bỏ đánh dấu Premium' : 'đánh dấu làm Premium';
-    
-    Alert.alert(
-      'Xác nhận',
-      `Bạn có muốn ${action} cho bài văn hóa này?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xác nhận',
-          onPress: () => {
-            setCultureData(prev => {
-              const newData = { ...prev };
-              Object.keys(newData).forEach(category => {
-                newData[category as CultureCategory] = newData[category as CultureCategory].map(
-                  item => item.id === cultureId 
-                    ? { ...item, isPremium: !item.isPremium }
-                    : item
-                );
-              });
-              return newData;
-            });
-          }
-        }
-      ]
-    );
+  const handleTogglePremium = async (id: string) => {
+    try {
+      await cultureService.togglePremium(id);
+      loadCultures(); // Refresh để thấy thay đổi icon
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể thay đổi trạng thái Premium');
+    }
   };
 
-  const toggleSortOrder = () => {
+  const toggleSort = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
-  const handleViewDetail = (cultureId: number) => {
-    navigation.navigate('CultureDetail', { cultureId });
-  };
-
-  // --- RENDER HELPERS ---
-  const sortedItems = [...(cultureData[selectedCategory] || [])].sort((a, b) => {
-    return sortOrder === 'asc' 
-      ? a.title.localeCompare(b.title)
-      : b.title.localeCompare(a.title);
-  });
-
-  const renderCultureCard = ({ item }: { item: CultureItem }) => (
+  // --- RENDER ---
+  const renderItem = ({ item }: { item: Culture }) => (
     <View style={styles.card}>
       <View style={styles.cardImageContainer}>
-        <Image source={item.image} style={styles.cardImage} resizeMode="cover" />
+        {/* URL ảnh từ Server */}
+        <Image 
+          source={{ uri: item.image }} 
+          style={styles.cardImage} 
+          resizeMode="cover" 
+          defaultSource={require('../../../assets/flower.png')} // Ảnh placeholder nếu lỗi
+        />
         {item.isPremium && (
           <View style={styles.premiumBadge}>
             <HugeiconsIcon icon={StarIcon} size={12} color={palette.warning} variant="solid" />
@@ -403,15 +193,8 @@ const TeacherCultureScreen: React.FC = () => {
 
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
-          <View style={styles.titleContainer}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.iconText}>🌸</Text>
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
-            </View>
-          </View>
+          <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
         </View>
 
         <View style={styles.statsContainer}>
@@ -420,38 +203,28 @@ const TeacherCultureScreen: React.FC = () => {
           </View>
           <View style={styles.statItem}>
             <HugeiconsIcon icon={ViewIcon} size={14} color={colors.light.textSecondary} />
-            <Text style={styles.statText}>{item.views} lượt xem</Text>
+            <Text style={styles.statText}>{item.views || 0} xem</Text>
           </View>
           <View style={styles.statItem}>
             <HugeiconsIcon icon={FavouriteIcon} size={14} color={colors.light.textSecondary} />
-            <Text style={styles.statText}>{item.likes} lượt thích</Text>
+            <Text style={styles.statText}>{item.likes || 0} thích</Text>
           </View>
         </View>
 
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             style={[styles.actionBtn, styles.viewBtn]}
-            onPress={() => handleViewDetail(item.id)}
+            onPress={() => navigation.navigate('TeacherCultureDetail', { cultureId: item._id! })}
           >
             <HugeiconsIcon icon={ViewIcon} size={16} color={colors.light.white} />
-            <Text style={styles.viewBtnText}>Xem chi tiết</Text>
+            <Text style={styles.viewBtnText}>Chi tiết</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.iconBtn}
-            onPress={() => handleEditCulture(item.id)}
-          >
-            <HugeiconsIcon 
-              icon={PenTool03Icon} 
-              size={18} 
-              color={colors.light.text}
-            />
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleOpenEdit(item)}>
+            <HugeiconsIcon icon={PenTool03Icon} size={18} color={colors.light.text} />
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.iconBtn}
-            onPress={() => handleTogglePremium(item.id, item.isPremium)}
-          >
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleTogglePremium(item._id!)}>
             <HugeiconsIcon 
               icon={StarIcon} 
               size={18} 
@@ -460,10 +233,7 @@ const TeacherCultureScreen: React.FC = () => {
             />
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.iconBtn}
-            onPress={() => handleDeleteCulture(item.id)}
-          >
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item._id!)}>
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
         </View>
@@ -473,33 +243,29 @@ const TeacherCultureScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header Section */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Quản lý Văn Hóa</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.sortBtn} onPress={toggleSortOrder}>
+          <TouchableOpacity style={styles.sortBtn} onPress={toggleSort}>
             <HugeiconsIcon icon={Sorting05Icon} size={20} color={colors.light.text} />
-            <Text style={styles.sortBtnText}>
-              {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-            </Text>
+            <Text style={styles.sortBtnText}>{sortOrder === 'asc' ? 'A-Z' : 'Mới nhất'}</Text>
           </TouchableOpacity>
           <Button 
             title="Tạo mới" 
             size="small" 
             variant="primary" 
-            onPress={handleAddCulture}
+            onPress={handleOpenAdd}
             leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color="white" />}
           />
         </View>
       </View>
 
-      {/* Category Filter Section */}
+      {/* Category Filter */}
       <View style={styles.categorySection}>
-        <Text style={styles.sectionLabel}>Thể loại</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
-          style={styles.tabScrollContainer}
           contentContainerStyle={styles.tabContentContainer}
         >
           {categories.map((category) => (
@@ -527,321 +293,89 @@ const TeacherCultureScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {/* Content Section */}
+      {/* List Content */}
       <View style={styles.content}>
-        <View style={styles.listHeader}>
-          <Text style={styles.listInfoText}>
-            Hiển thị {sortedItems.length} bài văn hóa • 
-            Sắp xếp: {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-          </Text>
-        </View>
-
-        <FlatList
-          data={sortedItems}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderCultureCard}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <HugeiconsIcon icon={BookOpen01Icon} size={48} color={colors.light.border} />
-              <Text style={styles.emptyTitle}>
-                Chưa có bài văn hóa nào trong {selectedCategory}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                Hãy tạo bài văn hóa đầu tiên để chia sẻ kiến thức về văn hóa Hàn Quốc
-              </Text>
-              <Button 
-                title="Tạo bài văn hóa đầu tiên" 
-                variant="secondary" 
-                onPress={handleAddCulture} 
-                leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.primary} />}
-              />
-            </View>
-          }
-        />
+        {loading ? (
+          <ActivityIndicator size="large" color={palette.primary} style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={cultures}
+            keyExtractor={(item) => item._id || Math.random().toString()}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <HugeiconsIcon icon={BookOpen01Icon} size={48} color={colors.light.border} />
+                <Text style={styles.emptyTitle}>Chưa có bài văn hóa nào</Text>
+                <Text style={styles.emptySubtitle}>Hãy tạo bài đầu tiên cho mục {selectedCategory}</Text>
+              </View>
+            }
+          />
+        )}
       </View>
 
-      {/* Modal Culture */}
+      {/* Modal */}
       <ModalCulture
         isOpen={modalVisible}
         onClose={() => setModalVisible(false)}
         mode={modalMode}
-        onSave={handleSaveCulture}
+        onSave={handleSave}
         culture={selectedCulture}
       />
     </View>
   );
 };
 
+// Styles (Giữ nguyên hoặc tùy chỉnh nhẹ)
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.light.background,
-    marginTop: 40,
-  },
-  
-  // Header
+  container: { flex: 1, backgroundColor: colors.light.background , marginTop: 40},
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.light.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, backgroundColor: colors.light.background, borderBottomWidth: 1, borderColor: colors.light.border,
   },
-  headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontFamily: typography.fonts.bold,
-    color: colors.light.text,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  sortBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.light.card,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-  },
-  sortBtnText: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.light.text,
-    fontFamily: typography.fonts.regular,
-  },
+  headerTitle: { fontSize: typography.fontSizes.lg, fontFamily: typography.fonts.bold, color: colors.light.text },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 8, backgroundColor: colors.light.card, borderRadius: 8, borderWidth: 1, borderColor: colors.light.border },
+  sortBtnText: { fontSize: 12, color: colors.light.text },
+  
+  categorySection: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.light.border },
+  tabContentContainer: { paddingHorizontal: 16, gap: 8 },
+  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.light.card, borderWidth: 1, borderColor: colors.light.border },
+  activeTabBtn: { backgroundColor: colors.light.primary + '15', borderColor: colors.light.primary },
+  tabText: { fontSize: 13, color: colors.light.textSecondary },
+  activeTabText: { color: colors.light.primary, fontFamily: typography.fonts.bold },
 
-  // Category Section
-  categorySection: {
-    backgroundColor: colors.light.background,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
-  },
-  sectionLabel: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.textSecondary,
-    marginBottom: 12,
-  },
-  tabScrollContainer: {
-    height: 40,
-  },
-  tabContentContainer: {
-    gap: 8,
-  },
-  tabBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.light.card,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-  },
-  activeTabBtn: {
-    backgroundColor: colors.light.primary + '15',
-    borderColor: colors.light.primary,
-  },
-  tabText: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.textSecondary,
-  },
-  activeTabText: {
-    color: colors.light.primary,
-    fontFamily: typography.fonts.regular,
-  },
+  content: { flex: 1, paddingHorizontal: 16 },
+  listContent: { paddingVertical: 16, gap: 16 },
+  
+  // Card Styles
+  card: { backgroundColor: colors.light.card, borderRadius: 12, borderWidth: 1, borderColor: colors.light.border, overflow: 'hidden' },
+  cardImageContainer: { height: 160, position: 'relative' },
+  cardImage: { width: '100%', height: '100%' },
+  premiumBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', gap: 4, backgroundColor: palette.warning + '20', padding: 6, borderRadius: 6, alignItems: 'center' },
+  premiumBadgeText: { fontSize: 10, color: palette.warning, fontWeight: 'bold' },
+  
+  cardContent: { padding: 16 },
+  cardHeader: { marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', color: colors.light.text, marginBottom: 4 },
+  cardSubtitle: { fontSize: 13, color: colors.light.textSecondary },
+  
+  statsContainer: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' },
+  categoryBadge: { backgroundColor: palette.info + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  categoryText: { fontSize: 11, color: palette.info },
+  statItem: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  statText: { fontSize: 11, color: colors.light.textSecondary },
 
-  // Content
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  listHeader: {
-    marginTop: 20,
-    marginBottom: 16,
-  },
-  listInfoText: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.light.textSecondary,
-    fontFamily: typography.fonts.regular,
-  },
-  listContent: {
-    paddingBottom: 20,
-    gap: 16,
-  },
+  actionButtons: { flexDirection: 'row', gap: 8, paddingTop: 12, borderTopWidth: 1, borderColor: colors.light.border + '50' },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8, borderRadius: 6 },
+  viewBtn: { backgroundColor: colors.light.secondary },
+  viewBtnText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+  iconBtn: { padding: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.light.border },
 
-  // Card
-  card: {
-    backgroundColor: colors.light.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    shadowColor: colors.light.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    overflow: 'hidden',
-  },
-  cardImageContainer: {
-    position: 'relative',
-    height: 160,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  premiumBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: palette.warning + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  premiumBadgeText: {
-    fontSize: 10,
-    color: palette.warning,
-    fontFamily: typography.fonts.bold,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  cardHeader: {
-    marginBottom: 12,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: colors.light.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconText: {
-    fontSize: 20,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: typography.fontSizes.md,
-    fontFamily: typography.fonts.semiBold,
-    color: colors.light.text,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.light.textSecondary,
-    fontFamily: typography.fonts.regular,
-    lineHeight: 20,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: palette.info + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  categoryText: {
-    fontSize: typography.fontSizes.xs,
-    color: palette.info,
-    fontFamily: typography.fonts.regular,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.light.border + '30',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.light.textSecondary,
-    fontFamily: typography.fonts.regular,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    flex: 1,
-  },
-  viewBtn: {
-    backgroundColor: colors.light.secondary,
-  },
-  viewBtnText: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.light.white,
-    fontFamily: typography.fonts.regular,
-  },
-  iconBtn: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: colors.light.background,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-  },
-
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: typography.fontSizes.lg,
-    color: colors.light.text,
-    fontFamily: typography.fonts.semiBold,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.light.textSecondary,
-    fontFamily: typography.fonts.regular,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
+  emptyState: { alignItems: 'center', marginTop: 60, gap: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: colors.light.text },
+  emptySubtitle: { fontSize: 14, color: colors.light.textSecondary }
 });
 
 export default TeacherCultureScreen;

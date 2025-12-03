@@ -15,23 +15,13 @@ import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import Button from '../Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-
-interface Vocabulary {
-  id: number;
-  word: string;
-  pronunciation: string;
-  meaning: string;
-  type: string;
-  category: string;
-  dateAdded: string;
-  examples: string[];
-}
+import { Vocabulary } from '../../services/vocabularyService';
 
 interface ModalVocabularyProps {
   isVisible: boolean;
   onClose: () => void;
   vocabulary?: Vocabulary | null;
-  onSave: (formData: Omit<Vocabulary, 'id' | 'dateAdded'>) => void;
+  onSave: (formData: Omit<Vocabulary, '_id' | 'lesson' | 'level'>) => void;
   isAdding?: boolean;
 }
 
@@ -44,34 +34,40 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     word: '',
-    pronunciation: '',
     meaning: '',
-    type: '',
+    pronunciation: '',
+    type: '명사', // Mặc định là 명사
     category: '',
-    examples: ['', ''],
+    examples: [''],
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Danh sách loại từ (word types) từ BE model
+  const wordTypes = ['명사', '동사', '형용사', '부사', '대명사', '감탄사'];
+
   useEffect(() => {
     if (vocabulary) {
+      // Khi chỉnh sửa, set dữ liệu từ vocabulary
       setFormData({
-        word: vocabulary.word,
-        pronunciation: vocabulary.pronunciation,
-        meaning: vocabulary.meaning,
-        type: vocabulary.type,
-        category: vocabulary.category,
-        examples: [...vocabulary.examples],
+        word: vocabulary.word || '',
+        meaning: vocabulary.meaning || '',
+        pronunciation: vocabulary.pronunciation || '',
+        type: vocabulary.type || '명사',
+        category: vocabulary.category || '',
+        examples: vocabulary.examples && vocabulary.examples.length > 0 
+          ? [...vocabulary.examples] 
+          : [''],
       });
     } else {
-      // Reset form when adding new vocabulary
+      // Reset form khi thêm mới
       setFormData({
         word: '',
-        pronunciation: '',
         meaning: '',
-        type: '',
+        pronunciation: '',
+        type: '명사',
         category: '',
-        examples: ['', ''],
+        examples: [''],
       });
     }
     setErrors({});
@@ -84,27 +80,19 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
       newErrors.word = 'Vui lòng nhập từ vựng';
     }
 
-    if (!formData.pronunciation.trim()) {
-      newErrors.pronunciation = 'Vui lòng nhập phiên âm';
-    }
-
     if (!formData.meaning.trim()) {
       newErrors.meaning = 'Vui lòng nhập nghĩa';
     }
 
     if (!formData.type.trim()) {
-      newErrors.type = 'Vui lòng nhập loại từ';
+      newErrors.type = 'Vui lòng chọn loại từ';
     }
 
-    if (!formData.category.trim()) {
-      newErrors.category = 'Vui lòng nhập danh mục';
-    }
-
-    // Validate examples - at least one example should be filled
-    const hasValidExample = formData.examples.some(example => example.trim() !== '');
-    if (!hasValidExample) {
-      newErrors.examples = 'Vui lòng nhập ít nhất một ví dụ';
-    }
+    // Examples không bắt buộc trong BE, nhưng có thể kiểm tra nếu muốn
+    // const hasValidExample = formData.examples.some(example => example.trim() !== '');
+    // if (!hasValidExample) {
+    //   newErrors.examples = 'Vui lòng nhập ít nhất một ví dụ';
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -112,17 +100,19 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
 
   const handleSave = (): void => {
     if (!validateForm()) {
+      Alert.alert('Lỗi', 'Vui lòng kiểm tra lại thông tin bắt buộc');
       return;
     }
 
-    // Filter out empty examples
+    // Lọc bỏ các ví dụ rỗng
     const filteredExamples = formData.examples.filter(example => example.trim() !== '');
 
+    // Gửi dữ liệu theo đúng interface của BE
     onSave({
       word: formData.word.trim(),
-      pronunciation: formData.pronunciation.trim(),
       meaning: formData.meaning.trim(),
-      type: formData.type.trim(),
+      pronunciation: formData.pronunciation.trim(),
+      type: formData.type,
       category: formData.category.trim(),
       examples: filteredExamples,
     });
@@ -155,6 +145,13 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
     onClose();
   };
 
+  const handleTypeSelect = (type: string): void => {
+    setFormData({ ...formData, type });
+    if (errors.type) {
+      setErrors(prev => ({ ...prev, type: '' }));
+    }
+  };
+
   return (
     <Modal
       visible={isVisible}
@@ -174,14 +171,19 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Word Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Từ vựng <Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>
+                Từ vựng (Tiếng Hàn) <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={[styles.input, errors.word && styles.inputError]}
                 value={formData.word}
-                onChangeText={(text) => setFormData({ ...formData, word: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, word: text });
+                  if (errors.word) setErrors(prev => ({ ...prev, word: '' }));
+                }}
                 placeholder="Nhập từ vựng tiếng Hàn"
                 placeholderTextColor={colors.light.textSecondary}
               />
@@ -190,62 +192,89 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
 
             {/* Pronunciation Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phiên âm <Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>Phát âm</Text>
               <TextInput
-                style={[styles.input, errors.pronunciation && styles.inputError]}
+                style={styles.input}
                 value={formData.pronunciation}
                 onChangeText={(text) => setFormData({ ...formData, pronunciation: text })}
-                placeholder="Nhập phiên âm"
+                placeholder="Nhập phiên âm (romaji)"
                 placeholderTextColor={colors.light.textSecondary}
               />
-              {errors.pronunciation && (
-                <Text style={styles.errorText}>{errors.pronunciation}</Text>
-              )}
+              <Text style={styles.hintText}>
+                Ví dụ: "sa-rang" cho từ "사랑"
+              </Text>
             </View>
 
             {/* Meaning Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nghĩa <Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>
+                Nghĩa (Tiếng Việt) <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={[styles.input, errors.meaning && styles.inputError]}
                 value={formData.meaning}
-                onChangeText={(text) => setFormData({ ...formData, meaning: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, meaning: text });
+                  if (errors.meaning) setErrors(prev => ({ ...prev, meaning: '' }));
+                }}
                 placeholder="Nhập nghĩa tiếng Việt"
                 placeholderTextColor={colors.light.textSecondary}
               />
               {errors.meaning && <Text style={styles.errorText}>{errors.meaning}</Text>}
             </View>
 
-            {/* Type Input */}
+            {/* Type Selection */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Loại từ <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={[styles.input, errors.type && styles.inputError]}
-                value={formData.type}
-                onChangeText={(text) => setFormData({ ...formData, type: text })}
-                placeholder="Ví dụ: 명사 (danh từ), 동사 (động từ)..."
-                placeholderTextColor={colors.light.textSecondary}
-              />
+              <Text style={styles.label}>
+                Loại từ <Text style={styles.required}>*</Text>
+              </Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.typeScrollView}
+              >
+                <View style={styles.typeContainer}>
+                  {wordTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.typeButton,
+                        formData.type === type && styles.typeButtonSelected
+                      ]}
+                      onPress={() => handleTypeSelect(type)}
+                    >
+                      <Text style={[
+                        styles.typeButtonText,
+                        formData.type === type && styles.typeButtonTextSelected
+                      ]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
               {errors.type && <Text style={styles.errorText}>{errors.type}</Text>}
+              <Text style={styles.hintText}>
+                Danh từ, động từ, tính từ, trạng từ, đại từ, thán từ
+              </Text>
             </View>
 
             {/* Category Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Danh mục <Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>Chủ đề</Text>
               <TextInput
-                style={[styles.input, errors.category && styles.inputError]}
+                style={styles.input}
                 value={formData.category}
                 onChangeText={(text) => setFormData({ ...formData, category: text })}
                 placeholder="Ví dụ: Cảm xúc, Chào hỏi, Ẩm thực..."
                 placeholderTextColor={colors.light.textSecondary}
               />
-              {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
             </View>
 
             {/* Examples */}
             <View style={styles.inputGroup}>
               <View style={styles.examplesHeader}>
-                <Text style={styles.label}>Ví dụ <Text style={styles.required}>*</Text></Text>
+                <Text style={styles.label}>Ví dụ</Text>
                 {formData.examples.length < 5 && (
                   <TouchableOpacity onPress={addExampleField} style={styles.addExampleButton}>
                     <Text style={styles.addExampleText}>+ Thêm ví dụ</Text>
@@ -260,12 +289,13 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
               {formData.examples.map((example, index) => (
                 <View key={index} style={styles.exampleInputContainer}>
                   <TextInput
-                    style={[styles.exampleInput, errors.examples && styles.inputError]}
+                    style={styles.exampleInput}
                     value={example}
                     onChangeText={(text) => handleExampleChange(text, index)}
                     placeholder={`Ví dụ ${index + 1} (tiếng Hàn hoặc tiếng Việt)`}
                     placeholderTextColor={colors.light.textSecondary}
                     multiline
+                    numberOfLines={2}
                   />
                   {formData.examples.length > 1 && (
                     <TouchableOpacity
@@ -277,6 +307,9 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
                   )}
                 </View>
               ))}
+              <Text style={styles.hintText}>
+                Có thể nhập ví dụ bằng tiếng Hàn hoặc tiếng Việt
+              </Text>
             </View>
           </ScrollView>
 
@@ -284,7 +317,7 @@ const ModalVocabulary: React.FC<ModalVocabularyProps> = ({
           <View style={styles.modalFooter}>
             <Button
               title="Hủy"
-              variant="primary"
+              variant="outline"
               onPress={handleClose}
             />
             <Button
@@ -309,23 +342,23 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: colors.light.background,
-    borderRadius: 12,
+    borderRadius: 16,
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: colors.light.black,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.light.border,
   },
@@ -339,11 +372,11 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalContent: {
+    padding: 20,
     maxHeight: 400,
-    padding: 16,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontSize: typography.fontSizes.sm,
@@ -351,11 +384,15 @@ const styles = StyleSheet.create({
     color: colors.light.text,
     marginBottom: 8,
   },
+  required: {
+    color: palette.error,
+    fontFamily: typography.fonts.semiBold,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.light.border,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 10,
+    padding: 14,
     fontSize: typography.fontSizes.md,
     fontFamily: typography.fonts.regular,
     color: colors.light.text,
@@ -363,21 +400,58 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: palette.error,
+    backgroundColor: palette.error + '10',
   },
   errorText: {
     fontSize: typography.fontSizes.xs,
     color: palette.error,
     fontFamily: typography.fonts.regular,
-    marginTop: 4,
+    marginTop: 6,
+  },
+  hintText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+    fontFamily: typography.fonts.regular,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  typeScrollView: {
+    marginHorizontal: -4,
+  },
+  typeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  typeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    backgroundColor: colors.light.card,
+  },
+  typeButtonSelected: {
+    backgroundColor: colors.light.primary,
+    borderColor: colors.light.primary,
+  },
+  typeButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.regular,
+    color: colors.light.text,
+  },
+  typeButtonTextSelected: {
+    color: colors.light.card,
+    fontFamily: typography.fonts.semiBold,
   },
   examplesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   addExampleButton: {
-    padding: 4,
+    padding: 8,
   },
   addExampleText: {
     fontSize: typography.fontSizes.sm,
@@ -386,29 +460,27 @@ const styles = StyleSheet.create({
   },
   exampleInputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   exampleInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.light.border,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 10,
+    padding: 14,
     fontSize: typography.fontSizes.md,
     fontFamily: typography.fonts.regular,
     color: colors.light.text,
     backgroundColor: colors.light.card,
-    minHeight: 40,
+    minHeight: 60,
+    textAlignVertical: 'top',
   },
   removeExampleButton: {
     padding: 8,
     marginLeft: 8,
+    marginTop: 8,
   },
-  required: {
-  color: palette.error,       // màu đỏ
-  fontFamily: typography.fonts.semiBold,
-},
   removeExampleText: {
     fontSize: typography.fontSizes.lg,
     color: palette.error,
@@ -416,7 +488,7 @@ const styles = StyleSheet.create({
   },
   modalFooter: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: colors.light.border,
     gap: 12,

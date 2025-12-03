@@ -22,28 +22,30 @@ import {
 import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { speakingService, SpeakingSubmission } from '../../services/speakingService';
 
+// 1. Thêm lessonId vào Props
 interface SpeakingEvaluationProps {
-  submission: any; // Thay any bằng Interface Submission nếu có
+  submission: SpeakingSubmission;
   onBack: () => void;
-  onSave?: (submissionId: string, evaluation: any) => void;
+  lessonId: string; // <--- THÊM DÒNG NÀY
 }
 
 const SpeakingEvaluation: React.FC<SpeakingEvaluationProps> = ({ 
   submission, 
-  onBack, 
-  onSave 
+  onBack,
+  lessonId // <--- NHẬN PROP Ở ĐÂY
 }) => {
-  // State chấm điểm
   const [scores, setScores] = useState({
-    pronunciation: 0,
-    fluency: 0,
-    vocabulary: 0,
-    grammar: 0,
-    content: 0
+    pronunciation: submission.evaluation?.pronunciation || 0,
+    fluency: submission.evaluation?.fluency || 0,
+    vocabulary: submission.evaluation?.vocabulary || 0,
+    grammar: submission.evaluation?.grammar || 0,
+    content: submission.evaluation?.content || 0
   });
-  const [feedback, setFeedback] = useState('');
-  const [suggestions, setSuggestions] = useState('');
+  const [feedback, setFeedback] = useState(submission.evaluation?.feedback || '');
+  const [suggestions, setSuggestions] = useState(submission.evaluation?.suggestions || '');
+  const [saving, setSaving] = useState(false);
 
   // Audio State
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -51,8 +53,10 @@ const SpeakingEvaluation: React.FC<SpeakingEvaluationProps> = ({
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
 
-  // Cleanup audio
   useEffect(() => {
+    // Debug
+    console.log('📝 [SpeakingEvaluation] Rendering with LessonID:', lessonId);
+    
     return () => {
       if (sound) sound.unloadAsync();
     };
@@ -107,26 +111,36 @@ const SpeakingEvaluation: React.FC<SpeakingEvaluationProps> = ({
     if (!isNaN(num) && num >= 0 && num <= 10) {
       setScores(prev => ({ ...prev, [key]: num }));
     } else if (value === '') {
-      // Allow clearing input temporarily
-      // Note: You might need a separate string state map if you want perfect UX for inputting decimals
+      setScores(prev => ({ ...prev, [key]: 0 }));
     }
   };
 
-  const handleSaveEvaluation = () => {
-    const evaluationData = {
-      scores,
-      totalScore: calculateTotal(),
-      feedback,
-      suggestions,
-      evaluatedAt: new Date().toISOString()
-    };
-    
-    if (onSave) {
-      onSave(submission.id, evaluationData);
-    } else {
-      Alert.alert('Đã lưu', 'Đánh giá đã được lưu thành công!');
+  const handleSaveEvaluation = async () => {
+    try {
+      setSaving(true);
+      
+      const evaluationData = {
+        pronunciation: scores.pronunciation,
+        fluency: scores.fluency,
+        vocabulary: scores.vocabulary,
+        grammar: scores.grammar,
+        content: scores.content,
+        feedback: feedback.trim(),
+        suggestions: suggestions.trim(),
+        lessonId: lessonId // <--- 2. GỬI KÈM LESSON ID
+      };
+
+      console.log('💾 [SpeakingEvaluation] Saving evaluation:', evaluationData);
+
+      await speakingService.evaluateSubmission(submission._id, evaluationData);
+      
+      Alert.alert('Thành công', 'Đã lưu đánh giá!');
+      onBack();
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể lưu đánh giá');
+    } finally {
+      setSaving(false);
     }
-    onBack();
   };
 
   const formatTime = (ms: number) => {
@@ -214,6 +228,7 @@ const SpeakingEvaluation: React.FC<SpeakingEvaluationProps> = ({
                    style={styles.scoreInput}
                    keyboardType="numeric"
                    placeholder="0-10"
+                   value={scores[item.key as keyof typeof scores].toString()}
                    onChangeText={(t) => handleScoreChange(item.key as keyof typeof scores, t)}
                  />
                </View>
@@ -248,9 +263,10 @@ const SpeakingEvaluation: React.FC<SpeakingEvaluationProps> = ({
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          title="Lưu đánh giá"
+          title={saving ? "Đang lưu..." : "Lưu đánh giá"}
           onPress={handleSaveEvaluation}
           variant="primary"
+          disabled={saving}
           leftIcon={<HugeiconsIcon icon={FloppyDiskIcon} size={20} color="white" />}
         />
       </View>
@@ -266,10 +282,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.light.border,
-    
   },
   headerTitle: { fontSize: 16, fontFamily: typography.fonts.bold, color: colors.light.text },
-  backBtn: { padding: 4},
+  backBtn: { padding: 4 },
   content: { padding: 16 },
   
   card: {

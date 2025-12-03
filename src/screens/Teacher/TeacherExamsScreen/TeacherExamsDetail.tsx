@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,6 @@ import {
   CheckmarkCircle02Icon,
   PenTool03Icon,
   ClipboardIcon,
-  UserIcon,
 } from '@hugeicons/core-free-icons';
 
 import Button from '../../../components/Button/Button';
@@ -44,163 +43,43 @@ import ModalReading from '../../../components/Modal/ModalReading';
 import ModalWriting from '../../../components/Modal/ModalWriting';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-
-// --- TYPES ---
-type ExamType = 'TOPIK I' | 'TOPIK II' | 'ESP';
-type SectionType = 'listening' | 'reading' | 'writing';
-
-interface QuestionOption {
-  _id: string;
-  question: string;
-  options: string[];
-  answer: number;
-  explanation?: string;
-}
-
-interface QuestionBase {
-  id: number;
-  type: SectionType;
-  title: string;
-  level: string;
-  questions?: QuestionOption[];
-}
-
-interface ListeningQuestion extends QuestionBase {
-  audioUrl?: string;
-  transcript?: string;
-  translation?: string;
-  duration?: number;
-}
-
-interface ReadingQuestion extends QuestionBase {
-  content?: string;
-  translation?: string;
-}
-
-interface WritingQuestion extends QuestionBase {
-  prompt?: string;
-  instruction?: string;
-  wordHint?: string[];
-  grammarHint?: string[];
-  minWords?: number;
-  sampleAnswer?: string;
-  sampleTranslation?: string;
-}
-
-type QuestionItem = ListeningQuestion & ReadingQuestion & WritingQuestion;
-
-interface ExamDetail {
-  id: number;
-  name: string;
-  type: ExamType;
-  isPremium: boolean;
-  duration: number;
-  listening: number;
-  reading: number;
-  writing: number;
-  questions: {
-    listening: ListeningQuestion[];
-    reading: ReadingQuestion[];
-    writing: WritingQuestion[];
-  };
-}
+import { useExam } from '../../../hooks/useExam';
+import { 
+  Exam, 
+  SectionType, 
+  ListeningQuestionData, 
+  ReadingQuestionData, 
+  WritingQuestionData,
+  QuestionOption
+} from '../../../services/examService';
 
 type TeacherStackParamList = {
   TeacherMain: undefined;
-  LessonDetail: { lessonId: number };
-  ExamDetail: { examId: number };
+  LessonDetail: { lessonId: string };
+  ExamDetail: { examId: string };
 };
 type ExamDetailRouteProp = RouteProp<TeacherStackParamList, 'ExamDetail'>;
 
-// --- MOCK DATA ---
-const mockExamData: Record<number, ExamDetail> = {
-  1: {
-    id: 1,
-    name: '제1회 한국어능력시험',
-    type: 'TOPIK I',
-    isPremium: false,
-    duration: 100,
-    listening: 30,
-    reading: 40,
-    writing: 0,
-    questions: {
-      listening: [
-        {
-          id: 1,
-          type: 'listening',
-          title: 'Bài nghe chào hỏi',
-          audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-          transcript: '안녕하세요. 저는 민수입니다. 만나서 반갑습니다.',
-          translation: 'Xin chào. Tôi là Minsu. Rất vui được gặp bạn.',
-          level: 'Sơ cấp 1',
-          duration: 120,
-          questions: [
-            {
-              _id: 'q1',
-              question: 'Người nói tên là gì?',
-              options: ['민수', '영희', '철수', '지현'],
-              answer: 0,
-              explanation: 'Trong câu "저는 민수입니다" có nghĩa là "Tôi là Minsu"'
-            }
-          ]
-        }
-      ],
-      reading: [
-        {
-          id: 101,
-          type: 'reading',
-          title: 'Bài đọc về gia đình',
-          content: '저는 가족이 4명입니다. 아버지, 어머니, 누나, 그리고 저입니다.\n아버지는 회사원입니다. 어머니는 선생님입니다.',
-          translation: 'Gia đình tôi có 4 người. Bố, mẹ, chị gái và tôi.\nBố tôi là nhân viên công ty. Mẹ tôi là giáo viên.',
-          level: 'Sơ cấp 1',
-          questions: [
-            {
-              _id: 'q2',
-              question: 'Gia đình có mấy người?',
-              options: ['3 người', '4 người', '5 người', '6 người'],
-              answer: 1,
-              explanation: 'Câu "가족이 4명입니다" có nghĩa là "Gia đình có 4 người"'
-            }
-          ]
-        }
-      ],
-      writing: []
-    }
-  },
-  10: {
-    id: 10,
-    name: '제1회 한국어능력시험',
-    type: 'TOPIK II',
-    isPremium: false,
-    duration: 180,
-    listening: 50,
-    reading: 50,
-    writing: 4,
-    questions: {
-      listening: [],
-      reading: [],
-      writing: [
-        {
-          id: 201,
-          type: 'writing',
-          title: '사회 문제에 대한 의견 쓰기',
-          prompt: '최근 증가하고 있는 1인 가구에 대해 어떻게 생각합니까?',
-          instruction: '1인 가구의 증가 원인과 이에 대한 여러분의 생각을 200자 이상으로 쓰세요.',
-          wordHint: ['1인 가구', '증가', '원인', '사회 현상'],
-          grammarHint: ['-에 대해', '-ㄴ/은/는 이유', '-다고 생각하다'],
-          minWords: 200,
-          level: 'Trung cấp',
-          sampleAnswer: '최근 1인 가구가 증가하는 이유는...',
-          sampleTranslation: 'Lý do số hộ gia đình một người gần đây tăng lên là...'
-        }
-      ]
-    }
-  }
-};
-
 // Component Audio Player cho phần Listening
-const SimpleAudioPlayer = ({ uri, isActive, isPlaying, onPlay, onPause, position, duration, onSeek }: any) => {
+const SimpleAudioPlayer = ({ 
+  uri, 
+  isActive, 
+  isPlaying, 
+  onPlay, 
+  onPause, 
+  position, 
+  duration 
+}: { 
+  uri: string;
+  isActive: boolean;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onPause: () => void;
+  position: number;
+  duration: number;
+}) => {
   const formatTime = (millis: number) => {
+    if (!millis || millis < 0) return '0:00';
     const totalSeconds = Math.floor(millis / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -212,23 +91,35 @@ const SimpleAudioPlayer = ({ uri, isActive, isPlaying, onPlay, onPause, position
       <TouchableOpacity 
         style={styles.playButton}
         onPress={isPlaying ? onPause : onPlay}
+        disabled={!uri}
       >
         <HugeiconsIcon 
           icon={isPlaying ? PauseCircleIcon : PlayCircle02Icon} 
           size={32} 
-          color={isActive ? colors.light.primary : palette.primary} 
+          color={isActive ? colors.light.primary : (uri ? palette.primary : colors.light.textSecondary)} 
         />
       </TouchableOpacity>
 
-      {isActive ? (
-        <View style={styles.sliderContainer}>
-          <Text style={styles.timeTextActive}>{formatTime(position)} / {formatTime(duration)}</Text>
-        </View>
-      ) : (
-        <View style={{ justifyContent: 'center' }}>
-          <Text style={styles.audioText}>Audio</Text>
-        </View>
-      )}
+      <View style={styles.sliderContainer}>
+        <Text style={styles.timeText}>
+          {formatTime(position)} / {formatTime(duration)}
+        </Text>
+        
+        {isActive ? (
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill,
+                { width: `${duration > 0 ? (position / duration) * 100 : 0}%` }
+              ]} 
+            />
+          </View>
+        ) : (
+          <Text style={styles.audioText}>
+            {uri ? 'Ready to play' : 'No audio available'}
+          </Text>
+        )}
+      </View>
     </View>
   );
 };
@@ -238,13 +129,13 @@ const TeacherExamsDetail: React.FC = () => {
   const route = useRoute<ExamDetailRouteProp>();
   const { examId } = route.params;
 
-  const [exam, setExam] = useState<ExamDetail | null>(null);
+  const [exam, setExam] = useState<Exam | null>(null);
   const [selectedSection, setSelectedSection] = useState<SectionType>('listening');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Audio State
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  // Audio State với useRef để tránh re-render
+  const soundRef = useRef<Audio.Sound | null>(null);
   const [playingLessonId, setPlayingLessonId] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -263,38 +154,75 @@ const TeacherExamsDetail: React.FC = () => {
     data: null,
   });
 
+  const { 
+    loading, 
+    fetchExamDetail, 
+    addQuestion, 
+    updateQuestion, 
+    deleteQuestion,
+    togglePremium 
+  } = useExam();
+
   // --- EFFECTS ---
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const data = mockExamData[examId];
-      if (data) {
-        setExam(data);
-      } else {
-        Alert.alert('Xin lỗi', 'Hiện tại đề thi đang không có sẵn. Vui lòng thử lại sau.', [
-          { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-      }
-      setIsLoading(false);
-    }, 500);
+    loadExamDetail();
 
-    return () => clearTimeout(timer);
+    // Cleanup khi component unmount
+    return () => {
+      unloadSound();
+    };
   }, [examId]);
 
+  // Cleanup khi component unmount
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
+      unloadSound();
     };
-  }, [sound]);
+  }, []);
+
+  const loadExamDetail = async () => {
+    // Dừng nhạc khi tải lại trang
+    await unloadSound();
+    
+    setIsLoading(true);
+    try {
+      const data = await fetchExamDetail(examId);
+      setExam(data);
+    } catch (error) {
+      console.error('Error loading exam detail:', error);
+      Alert.alert('Lỗi', 'Không thể tải chi tiết đề thi');
+      navigation.goBack();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // --- AUDIO HANDLERS ---
+  const unloadSound = async () => {
+    if (soundRef.current) {
+      try {
+        console.log('🔄 Unloading sound');
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      } catch (error) {
+        console.error('Error unloading sound:', error);
+      } finally {
+        setPlayingLessonId(null);
+        setIsPlaying(false);
+        setPosition(0);
+        setDuration(0);
+      }
+    }
+  };
+
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
       setPosition(status.positionMillis);
       setDuration(status.durationMillis || 0);
       
       if (status.didJustFinish) {
+        console.log('✅ Playback finished');
         setPlayingLessonId(null);
         setIsPlaying(false);
         setPosition(0);
@@ -302,42 +230,88 @@ const TeacherExamsDetail: React.FC = () => {
     }
   };
 
-  const handlePlayAudio = async (lesson: ListeningQuestion) => {
+  const handlePlayAudio = async (lesson: ListeningQuestionData) => {
+    console.log('🎵 Attempting to play audio:', lesson.audioUrl);
+    
     if (!lesson.audioUrl) {
       Alert.alert('Thông báo', 'Bài học này chưa có file âm thanh');
       return;
     }
 
+    // Kiểm tra URL hợp lệ
+    if (!lesson.audioUrl.startsWith('http')) {
+      Alert.alert('Lỗi', 'URL audio không hợp lệ. URL phải bắt đầu bằng http:// hoặc https://');
+      return;
+    }
+
     try {
-      if (playingLessonId === lesson.id && sound) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
+      // Nếu đang phát bài này, pause
+      if (playingLessonId === lesson.id) {
+        console.log('⏸️ Pausing current audio');
+        await handlePauseAudio();
         return;
       }
 
-      if (sound) {
-        await sound.unloadAsync();
-      }
+      // Nếu có sound đang phát, dừng nó trước
+      await unloadSound();
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
+      // Thiết lập Audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      console.log('▶️ Creating new sound object');
+      const { sound } = await Audio.Sound.createAsync(
         { uri: lesson.audioUrl },
-        { shouldPlay: true },
+        {
+          shouldPlay: true,
+          isLooping: false,
+          isMuted: false,
+          volume: 1.0,
+          rate: 1.0,
+        },
         onPlaybackStatusUpdate
       );
 
-      setSound(newSound);
+      soundRef.current = sound;
       setPlayingLessonId(lesson.id);
       setIsPlaying(true);
+      console.log('✅ Sound created and playing successfully');
 
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể phát file âm thanh này');
+    } catch (error: any) {
+      console.error('❌ Error playing audio:', error);
+      
+      let errorMessage = 'Không thể phát file âm thanh này';
+      
+      if (error.message.includes('Network request failed')) {
+        errorMessage = 'Không thể kết nối đến file audio. Vui lòng kiểm tra kết nối mạng.';
+      } else if (error.message.includes('Unsupported')) {
+        errorMessage = 'Định dạng file audio không được hỗ trợ. Vui lòng sử dụng file MP3 hoặc M4A.';
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Không tìm thấy file audio tại URL này.';
+      }
+      
+      Alert.alert('Lỗi', errorMessage);
+      
+      // Reset state
+      setPlayingLessonId(null);
+      setIsPlaying(false);
     }
   };
 
   const handlePauseAudio = async () => {
-    if (sound) {
-      await sound.pauseAsync();
-      setIsPlaying(false);
+    if (soundRef.current) {
+      try {
+        console.log('⏸️ Pausing audio');
+        await soundRef.current.pauseAsync();
+        setIsPlaying(false);
+      } catch (error) {
+        console.error('Error pausing audio:', error);
+      }
     }
   };
 
@@ -350,55 +324,75 @@ const TeacherExamsDetail: React.FC = () => {
     setModalState({ ...modalState, isOpen: false });
   };
 
-  const handleSaveData = (data: any) => {
+  const handleSaveData = async (data: any) => {
     if (!exam) return;
 
-    if (modalState.mode === 'add') {
-      const newFromModal = { 
-        ...data, 
-        id: Date.now(),
-        type: selectedSection
-      };
-      
-      setExam({
-        ...exam,
-        questions: {
-          ...exam.questions,
-          [selectedSection]: [...exam.questions[selectedSection], newFromModal]
-        }
-      });
-    } else {
-      setExam({
-        ...exam,
-        questions: {
-          ...exam.questions,
-          [selectedSection]: exam.questions[selectedSection].map((item: any) => 
-            item.id === data.id ? data : item
-          )
-        }
-      });
+    try {
+      if (modalState.mode === 'add') {
+        // Tạo một bản sao của data để xử lý
+        const payload = { ...data };
+        
+        // Xóa trường id hoặc _id nếu nó là chuỗi rỗng
+        if (payload._id === '') delete payload._id;
+        if (payload.id === '') delete payload.id;
+        // Thậm chí xóa luôn cho chắc chắn vì đây là thao tác THÊM MỚI
+        delete payload._id;
+        delete payload.id;
+
+        const newQuestion = await addQuestion(exam._id, {
+          section: selectedSection,
+          ...payload, // Gửi payload đã làm sạch
+        });
+        setExam(newQuestion);
+        // --------------------
+      } else {
+        // Update existing question
+        const updatedExam = await updateQuestion(
+          exam._id,
+          data.id || data._id, // Đảm bảo lấy đúng ID để update
+          {
+            ...data,
+            section: selectedSection,
+          }
+        );
+        setExam(updatedExam);
+      }
+      closeModal();
+    } catch (error) {
+      console.error('Error saving question:', error);
+      Alert.alert('Lỗi', 'Không thể lưu câu hỏi. Vui lòng kiểm tra lại dữ liệu.');
     }
-    closeModal();
   };
 
-  const handleDeleteItem = (itemId: number) => {
+  const handleDeleteItem = async (itemId: number) => {
     Alert.alert('Xóa', 'Bạn có chắc muốn xóa câu hỏi này?', [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           if (!exam) return;
-          setExam({
-            ...exam,
-            questions: {
-              ...exam.questions,
-              [selectedSection]: exam.questions[selectedSection].filter((q: any) => q.id !== itemId)
-            }
-          });
+          try {
+            const updatedExam = await deleteQuestion(exam._id, itemId);
+            setExam(updatedExam);
+          } catch (error) {
+            console.error('Error deleting question:', error);
+          }
         }
       }
     ]);
+  };
+
+  const handleTogglePremium = async () => {
+    if (!exam) return;
+    
+    try {
+      const updatedExam = await togglePremium(exam._id);
+      setExam(updatedExam);
+      Alert.alert('Thành công', 'Đã cập nhật trạng thái premium');
+    } catch (error) {
+      console.error('Error toggling premium:', error);
+    }
   };
 
   // --- RENDER HELPERS ---
@@ -409,7 +403,7 @@ const TeacherExamsDetail: React.FC = () => {
       { id: 'reading' as SectionType, label: 'ĐỌC', icon: BookOpen01Icon, count: exam.questions.reading.length }
     ];
     
-    if (exam.type === 'TOPIK II' || exam.type === 'ESP') {
+    if (exam.examType === 'topik2' || exam.examType === 'esp') {
       base.push({ 
         id: 'writing' as SectionType, 
         label: 'VIẾT', 
@@ -439,7 +433,7 @@ const TeacherExamsDetail: React.FC = () => {
   };
 
   // --- RENDER COMPONENTS ---
-  const renderListeningCard = (item: ListeningQuestion, index: number) => {
+  const renderListeningCard = (item: ListeningQuestionData, index: number) => {
     const isActive = playingLessonId === item.id;
     
     return (
@@ -469,26 +463,28 @@ const TeacherExamsDetail: React.FC = () => {
           )}
 
           {/* Script */}
-          <View style={styles.scriptBox}>
-            <View style={styles.scriptHeader}>
-              <HugeiconsIcon icon={LicenseDraftIcon} size={14} color={colors.light.text} />
-              <Text style={styles.scriptTitle}>Script:</Text>
+          {item.transcript && (
+            <View style={styles.scriptBox}>
+              <View style={styles.scriptHeader}>
+                <HugeiconsIcon icon={LicenseDraftIcon} size={14} color={colors.light.text} />
+                <Text style={styles.scriptTitle}>Script:</Text>
+              </View>
+              <Text style={styles.scriptText}>{item.transcript}</Text>
+              {item.translation && (
+                <Text style={styles.translationText}>{item.translation}</Text>
+              )}
             </View>
-            <Text style={styles.scriptText}>{item.transcript}</Text>
-            {item.translation && (
-              <Text style={styles.translationText}>{item.translation}</Text>
-            )}
-          </View>
+          )}
 
           {/* Questions */}
           {item.questions && item.questions.length > 0 && (
             <View style={styles.subQuestions}>
               <Text style={styles.subQHeader}>Câu hỏi ({item.questions.length}):</Text>
-              {item.questions.map((q, idx) => (
+              {item.questions.map((q: QuestionOption, idx: number) => (
                 <View key={q._id} style={styles.subQItem}>
                   <Text style={styles.subQText}>{idx + 1}. {q.question}</Text>
                   <View style={styles.optionsContainer}>
-                    {q.options.map((opt, optIdx) => {
+                    {q.options.map((opt: string, optIdx: number) => {
                       const isAnswer = optIdx === q.answer;
                       return (
                         <View key={optIdx} style={styles.optionRow}>
@@ -512,10 +508,18 @@ const TeacherExamsDetail: React.FC = () => {
         </View>
 
         <View style={styles.cardActions}>
-          <TouchableOpacity style={[styles.iconBtn, styles.editBtn]} onPress={() => openModal('listening', 'edit', item)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.editBtn]} 
+            onPress={() => openModal('listening', 'edit', item)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Edit01Icon} size={18} color={palette.warning} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, styles.deleteBtn]} onPress={() => handleDeleteItem(item.id)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.deleteBtn]} 
+            onPress={() => handleDeleteItem(item.id)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
         </View>
@@ -523,7 +527,7 @@ const TeacherExamsDetail: React.FC = () => {
     );
   };
 
-  const renderReadingCard = (item: ReadingQuestion, index: number) => {
+  const renderReadingCard = (item: ReadingQuestionData, index: number) => {
     return (
       <View key={item.id} style={styles.questionCard}>
         <View style={styles.cardHeader}>
@@ -538,13 +542,15 @@ const TeacherExamsDetail: React.FC = () => {
 
         <View style={styles.cardContent}>
           {/* Content */}
-          <View style={styles.textContainer}>
-            <View style={styles.textHeader}>
-              <HugeiconsIcon icon={LicenseDraftIcon} size={14} color={colors.light.text} />
-              <Text style={styles.sectionHeaderTitle}>Nội dung:</Text>
+          {item.content && (
+            <View style={styles.textContainer}>
+              <View style={styles.textHeader}>
+                <HugeiconsIcon icon={LicenseDraftIcon} size={14} color={colors.light.text} />
+                <Text style={styles.sectionHeaderTitle}>Nội dung:</Text>
+              </View>
+              <Text style={styles.contentText}>{item.content}</Text>
             </View>
-            <Text style={styles.contentText}>{item.content}</Text>
-          </View>
+          )}
 
           {/* Translation */}
           {item.translation && (
@@ -561,11 +567,11 @@ const TeacherExamsDetail: React.FC = () => {
           {item.questions && item.questions.length > 0 && (
             <View style={styles.subQuestions}>
               <Text style={styles.subQHeader}>Câu hỏi ({item.questions.length}):</Text>
-              {item.questions.map((q, idx) => (
+              {item.questions.map((q: QuestionOption, idx: number) => (
                 <View key={q._id} style={styles.subQItem}>
                   <Text style={styles.subQText}>{idx + 1}. {q.question}</Text>
                   <View style={styles.optionsContainer}>
-                    {q.options.map((opt, optIdx) => {
+                    {q.options.map((opt: string, optIdx: number) => {
                       const isAnswer = optIdx === q.answer;
                       return (
                         <View key={optIdx} style={styles.optionRow}>
@@ -589,10 +595,18 @@ const TeacherExamsDetail: React.FC = () => {
         </View>
 
         <View style={styles.cardActions}>
-          <TouchableOpacity style={[styles.iconBtn, styles.editBtn]} onPress={() => openModal('reading', 'edit', item)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.editBtn]} 
+            onPress={() => openModal('reading', 'edit', item)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Edit01Icon} size={18} color={palette.warning} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, styles.deleteBtn]} onPress={() => handleDeleteItem(item.id)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.deleteBtn]} 
+            onPress={() => handleDeleteItem(item.id)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
         </View>
@@ -600,7 +614,7 @@ const TeacherExamsDetail: React.FC = () => {
     );
   };
 
-  const renderWritingCard = (item: WritingQuestion, index: number) => {
+  const renderWritingCard = (item: WritingQuestionData, index: number) => {
     return (
       <View key={item.id} style={styles.questionCard}>
         <View style={styles.cardHeader}>
@@ -615,13 +629,15 @@ const TeacherExamsDetail: React.FC = () => {
 
         <View style={styles.cardContent}>
           {/* Prompt */}
-          <View style={styles.textContainer}>
-            <View style={styles.textHeader}>
-              <HugeiconsIcon icon={PenTool03Icon} size={14} color={colors.light.text} />
-              <Text style={styles.sectionHeaderTitle}>Đề bài:</Text>
+          {item.prompt && (
+            <View style={styles.textContainer}>
+              <View style={styles.textHeader}>
+                <HugeiconsIcon icon={PenTool03Icon} size={14} color={colors.light.text} />
+                <Text style={styles.sectionHeaderTitle}>Đề bài:</Text>
+              </View>
+              <Text style={styles.contentText}>{item.prompt}</Text>
             </View>
-            <Text style={styles.contentText}>{item.prompt}</Text>
-          </View>
+          )}
 
           {/* Instruction */}
           {item.instruction && (
@@ -639,7 +655,7 @@ const TeacherExamsDetail: React.FC = () => {
             <View style={styles.hintContainer}>
               <Text style={styles.hintLabel}>Từ vựng gợi ý:</Text>
               <View style={styles.chipContainer}>
-                {item.wordHint.map((w, i) => (
+                {item.wordHint.map((w: string, i: number) => (
                   <View key={i} style={styles.chip}>
                     <Text style={styles.chipText}>{w}</Text>
                   </View>
@@ -653,7 +669,7 @@ const TeacherExamsDetail: React.FC = () => {
             <View style={styles.hintContainer}>
               <Text style={styles.hintLabel}>Ngữ pháp gợi ý:</Text>
               <View style={styles.chipContainer}>
-                {item.grammarHint.map((g, i) => (
+                {item.grammarHint.map((g: string, i: number) => (
                   <View key={i} style={[styles.chip, { backgroundColor: palette.purple + '15' }]}>
                     <Text style={[styles.chipText, { color: palette.purple }]}>{g}</Text>
                   </View>
@@ -669,13 +685,35 @@ const TeacherExamsDetail: React.FC = () => {
               <Text style={styles.infoText}>Số từ tối thiểu: {item.minWords} từ</Text>
             </View>
           )}
+
+          {/* Sample Answer */}
+          {item.sampleAnswer && (
+            <View style={[styles.textContainer, { backgroundColor: palette.info + '05', borderColor: palette.info + '20' }]}>
+              <View style={styles.textHeader}>
+                <HugeiconsIcon icon={ClipboardIcon} size={14} color={palette.info} />
+                <Text style={[styles.sectionHeaderTitle, { color: palette.info }]}>Bài viết mẫu:</Text>
+              </View>
+              <Text style={styles.contentText}>{item.sampleAnswer}</Text>
+              {item.sampleTranslation && (
+                <Text style={styles.translationText}>{item.sampleTranslation}</Text>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.cardActions}>
-          <TouchableOpacity style={[styles.iconBtn, styles.editBtn]} onPress={() => openModal('writing', 'edit', item)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.editBtn]} 
+            onPress={() => openModal('writing', 'edit', item)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Edit01Icon} size={18} color={palette.warning} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, styles.deleteBtn]} onPress={() => handleDeleteItem(item.id)}>
+          <TouchableOpacity 
+            style={[styles.iconBtn, styles.deleteBtn]} 
+            onPress={() => handleDeleteItem(item.id)}
+            disabled={loading}
+          >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
         </View>
@@ -683,14 +721,14 @@ const TeacherExamsDetail: React.FC = () => {
     );
   };
 
-  const renderQuestionCard = (item: QuestionItem, index: number) => {
+  const renderQuestionCard = (item: any, index: number) => {
     switch (selectedSection) {
       case 'listening':
-        return renderListeningCard(item as ListeningQuestion, index);
+        return renderListeningCard(item as ListeningQuestionData, index);
       case 'reading':
-        return renderReadingCard(item as ReadingQuestion, index);
+        return renderReadingCard(item as ReadingQuestionData, index);
       case 'writing':
-        return renderWritingCard(item as WritingQuestion, index);
+        return renderWritingCard(item as WritingQuestionData, index);
       default:
         return null;
     }
@@ -715,23 +753,35 @@ const TeacherExamsDetail: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => {
+          // Dừng nhạc khi quay lại
+          unloadSound();
+          navigation.goBack();
+        }} style={styles.backBtn}>
           <HugeiconsIcon icon={ArrowLeft01Icon} size={24} color={colors.light.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{exam.name}</Text>
-          {exam.isPremium && (
-            <View style={styles.premiumBadge}>
-              <HugeiconsIcon icon={StarIcon} size={12} color={palette.warning} variant="solid" />
-              <Text style={styles.premiumText}>Premium</Text>
-            </View>
-          )}
+          <Text style={styles.headerTitle} numberOfLines={1}>{exam.title}</Text>
+          <View style={styles.headerBadges}>
+            {exam.isPremium && (
+              <TouchableOpacity 
+                style={styles.premiumBadge}
+                onPress={handleTogglePremium}
+                disabled={loading}
+              >
+                <HugeiconsIcon icon={StarIcon} size={12} color={palette.warning} variant="solid" />
+                <Text style={styles.premiumText}>Premium</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={styles.examTypeBadge}>{exam.examType}</Text>
+          </View>
         </View>
         <Button 
           title="Lưu" 
           size="small" 
           variant="primary" 
-          onPress={() => Alert.alert('Thành công', 'Đã lưu thay đổi')} 
+          onPress={() => Alert.alert('Thông báo', 'Dữ liệu đã được tự động lưu')} 
+          disabled={loading}
         />
       </View>
 
@@ -740,7 +790,7 @@ const TeacherExamsDetail: React.FC = () => {
         <View style={styles.statRow}>
           <View style={styles.statCol}>
             <Text style={styles.statLabel}>Loại đề</Text>
-            <Text style={styles.statValue}>{exam.type}</Text>
+            <Text style={styles.statValue}>{exam.examType}</Text>
           </View>
           <View style={styles.statCol}>
             <Text style={styles.statLabel}>Thời gian</Text>
@@ -754,6 +804,29 @@ const TeacherExamsDetail: React.FC = () => {
             <Text style={styles.statValue}>{totalQuestions}</Text>
           </View>
         </View>
+        <View style={styles.statRow}>
+          <View style={styles.statCol}>
+            <Text style={styles.statLabel}>Nghe</Text>
+            <View style={{flexDirection:'row', alignItems:'center', gap:4}}>
+              <HugeiconsIcon icon={HeadphonesIcon} size={14} color={colors.light.text} />
+              <Text style={styles.statValue}>{exam.listening}</Text>
+            </View>
+          </View>
+          <View style={styles.statCol}>
+            <Text style={styles.statLabel}>Đọc</Text>
+            <View style={{flexDirection:'row', alignItems:'center', gap:4}}>
+              <HugeiconsIcon icon={BookOpen01Icon} size={14} color={colors.light.text} />
+              <Text style={styles.statValue}>{exam.reading}</Text>
+            </View>
+          </View>
+          <View style={styles.statCol}>
+            <Text style={styles.statLabel}>Viết</Text>
+            <View style={{flexDirection:'row', alignItems:'center', gap:4}}>
+              <HugeiconsIcon icon={PencilIcon} size={14} color={colors.light.text} />
+              <Text style={styles.statValue}>{exam.writing}</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -763,6 +836,7 @@ const TeacherExamsDetail: React.FC = () => {
             key={section.id}
             style={[styles.tab, selectedSection === section.id && styles.activeTab]}
             onPress={() => setSelectedSection(section.id)}
+            disabled={loading}
           >
             <HugeiconsIcon 
               icon={section.icon} 
@@ -789,6 +863,7 @@ const TeacherExamsDetail: React.FC = () => {
             value={searchTerm}
             onChangeText={setSearchTerm}
             placeholderTextColor={colors.light.textSecondary}
+            editable={!loading}
           />
         </View>
         
@@ -798,6 +873,7 @@ const TeacherExamsDetail: React.FC = () => {
           variant="primary" 
           onPress={() => openModal(selectedSection, 'add')}
           leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color="white" />}
+          disabled={loading}
         />
       </View>
 
@@ -808,7 +884,10 @@ const TeacherExamsDetail: React.FC = () => {
         </Text>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
         {currentQuestions.length > 0 ? (
           currentQuestions.map((item: any, index: number) => renderQuestionCard(item, index))
         ) : (
@@ -820,6 +899,7 @@ const TeacherExamsDetail: React.FC = () => {
               variant="secondary" 
               onPress={() => openModal(selectedSection, 'add')}
               style={{marginTop: 12}} 
+              disabled={loading}
             />
           </View>
         )}
@@ -830,7 +910,7 @@ const TeacherExamsDetail: React.FC = () => {
         <ModalListening
           isVisible={modalState.isOpen}
           onClose={closeModal}
-          lesson={modalState.data}
+          listening={modalState.data}
           onSave={handleSaveData}
           isAdding={modalState.mode === 'add'}
         />
@@ -865,10 +945,12 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 16, fontFamily: typography.fonts.bold, color: colors.light.text },
-  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: palette.warning + '20', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 },
+  headerBadges: { flexDirection: 'row', gap: 6, marginTop: 2 },
+  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: palette.warning + '20', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   premiumText: { fontSize: 10, color: palette.warning, fontFamily: typography.fonts.bold },
+  examTypeBadge: { fontSize: 10, color: colors.light.primary, backgroundColor: colors.light.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
 
-  statsCard: { margin: 16, padding: 16, backgroundColor: colors.light.card, borderRadius: 12, borderWidth: 1, borderColor: colors.light.border },
+  statsCard: { margin: 16, padding: 16, backgroundColor: colors.light.card, borderRadius: 12, borderWidth: 1, borderColor: colors.light.border, gap: 12 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between' },
   statCol: { alignItems: 'center', flex: 1 },
   statLabel: { fontSize: 12, color: colors.light.textSecondary, marginBottom: 4 },
@@ -904,12 +986,46 @@ const styles = StyleSheet.create({
   cardContent: { gap: 12 },
   
   // Audio Player
-  audioPlayer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.light.primary + '10', padding: 12, borderRadius: 8, gap: 12 },
-  audioPlayerActive: { backgroundColor: colors.light.card, borderWidth: 1, borderColor: colors.light.primary },
-  playButton: { padding: 4 },
-  sliderContainer: { flex: 1 },
-  timeTextActive: { fontSize: 12, color: colors.light.textSecondary, fontFamily: typography.fonts.regular },
-  audioText: { fontSize: 14, color: colors.light.primary, fontFamily: typography.fonts.semiBold },
+  audioPlayer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: colors.light.primary + '10', 
+    padding: 12, 
+    borderRadius: 8, 
+    gap: 12 
+  },
+  audioPlayerActive: { 
+    backgroundColor: colors.light.card, 
+    borderWidth: 1, 
+    borderColor: colors.light.primary 
+  },
+  playButton: { 
+    padding: 4 
+  },
+  sliderContainer: { 
+    flex: 1 
+  },
+  timeText: { 
+    fontSize: 12, 
+    color: colors.light.textSecondary, 
+    fontFamily: typography.fonts.regular,
+    marginBottom: 4
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.light.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.light.primary,
+  },
+  audioText: { 
+    fontSize: 12, 
+    color: colors.light.textSecondary, 
+    fontFamily: typography.fonts.regular 
+  },
 
   // Text Content
   scriptBox: { backgroundColor: colors.light.background, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.light.border + '50' },

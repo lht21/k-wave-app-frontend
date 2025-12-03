@@ -1,5 +1,4 @@
-// services/authService.ts
-import API_BASE_URL, { getAuthHeaders } from '../api/api';
+import API_BASE_URL from '../api/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AUTH_URL = API_BASE_URL + "/auth";
@@ -32,6 +31,43 @@ interface AuthResponse {
   msg?: string;
 }
 
+// ✅ THÊM: Hàm lấy headers với authentication
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  try {
+    const token = await AsyncStorage.getItem('authToken');
+    
+    if (token) {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+    }
+    
+    return {
+      'Content-Type': 'application/json',
+    };
+  } catch (error) {
+    console.error('Error getting auth headers:', error);
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+};
+
+// ✅ THÊM: Hàm lấy user data từ AsyncStorage
+export const getUserData = async (): Promise<User | null> => {
+  try {
+    const userData = await AsyncStorage.getItem('userData');
+    if (userData) {
+      return JSON.parse(userData);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user data:', error);
+    return null;
+  }
+};
+
 export const authService = {
   // Đăng ký
   register: async (credentials: RegisterCredentials): Promise<AuthResponse> => {
@@ -43,7 +79,9 @@ export const authService = {
 
       const response = await fetch(`${AUTH_URL}/register`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(credentials)
       });
 
@@ -123,9 +161,10 @@ export const authService = {
   // Quên mật khẩu
   forgotPassword: async (email: string): Promise<any> => {
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${AUTH_URL}/forgot-password`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({ email })
       });
 
@@ -144,9 +183,10 @@ export const authService = {
   // Reset mật khẩu
   resetPassword: async (resetData: { otp: string; newPassword: string }): Promise<any> => {
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${AUTH_URL}/reset-password`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify(resetData)
       });
 
@@ -165,9 +205,10 @@ export const authService = {
   // Gửi lại OTP
   resendOtp: async (email: string): Promise<any> => {
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${AUTH_URL}/resend-password-otp`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({ email })
       });
 
@@ -181,5 +222,20 @@ export const authService = {
     } catch (error) {
       throw error;
     }
-  }
+  },
+
+  // Lấy token từ AsyncStorage
+  getToken: async (): Promise<string> => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+      return token;
+    } catch (error) {
+      console.error('Lỗi khi lấy token:', error);
+      throw error;
+    }
+  },
+
 };
