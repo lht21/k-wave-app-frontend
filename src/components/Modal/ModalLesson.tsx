@@ -1,3 +1,4 @@
+// src/components/Modal/ModalLesson.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,25 +14,14 @@ import {
 } from 'react-native';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { Lesson } from '../../services/lessonService';
 
-interface Lesson {
-  id?: number;
-  code: string;
-  title: string;
-  description: string;
-  level: string;
-  order: number;
-  estimatedDuration: number;
-  isPremium: boolean;
-  viewCount?: number;
-  completionCount?: number;
-}
-
+// SỬA INTERFACE - Dùng interface từ lessonService
 interface ModalLessonProps {
   isVisible: boolean;
   onClose: () => void;
   lesson?: Lesson | null;
-  onSave: (data: Omit<Lesson, 'id' | 'viewCount' | 'completionCount'>) => void;
+  onSave: (data: Omit<Lesson, '_id' | 'viewCount' | 'completionCount' | 'author'>) => void;
 }
 
 const ModalLesson: React.FC<ModalLessonProps> = ({
@@ -60,8 +50,8 @@ const ModalLesson: React.FC<ModalLessonProps> = ({
         description: lesson.description,
         level: lesson.level,
         order: lesson.order,
-        estimatedDuration: lesson.estimatedDuration,
-        isPremium: lesson.isPremium
+        estimatedDuration: lesson.estimatedDuration || 60,
+        isPremium: lesson.isPremium || false
       });
     } else {
       setFormData({
@@ -94,6 +84,10 @@ const ModalLesson: React.FC<ModalLessonProps> = ({
 
     if (formData.order <= 0) {
       newErrors.order = 'Thứ tự phải lớn hơn 0';
+    }
+
+    if (formData.estimatedDuration <= 0) {
+      newErrors.estimatedDuration = 'Thời lượng phải lớn hơn 0';
     }
 
     setErrors(newErrors);
@@ -250,6 +244,23 @@ const ModalLesson: React.FC<ModalLessonProps> = ({
                 keyboardType="numeric"
               />
               {errors.order && <Text style={styles.errorText}>{errors.order}</Text>}
+            </View>
+
+            {/* Estimated Duration */}
+            <View style={styles.formGroup}>
+              <RequiredLabel>Thời lượng ước tính (phút)</RequiredLabel>
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.estimatedDuration && styles.inputError
+                ]}
+                value={formData.estimatedDuration.toString()}
+                onChangeText={(value) => handleChange('estimatedDuration', parseInt(value) || 0)}
+                placeholder="60"
+                placeholderTextColor={colors.light.textSecondary}
+                keyboardType="numeric"
+              />
+              {errors.estimatedDuration && <Text style={styles.errorText}>{errors.estimatedDuration}</Text>}
             </View>
 
             {/* Premium Switch */}

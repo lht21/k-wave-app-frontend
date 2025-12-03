@@ -5,7 +5,8 @@ import {
     TouchableOpacity, 
     ScrollView,
     Alert,
-    StyleSheet 
+    StyleSheet,
+    ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -21,27 +22,15 @@ import Button from '../../../components/Button/Button';
 import ModalLesson from '../../../components/Modal/ModalLesson';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
+import { lessonService, Lesson } from '../../../services/lessonService';
 
 // Types
-interface Lesson {
-    id: number;
-    code: string;
-    title: string;
-    description: string;
-    level: string;
-    order: number;
-    estimatedDuration: number;
-    isPremium: boolean;
-    viewCount: number;
-    completionCount: number;
-}
-
 interface TeacherLessonTableProps {
     selectedLevel: string;
 }
 
 type RootStackParamList = {
-    LessonDetail: { lessonId: number };
+    LessonDetail: { lessonId: string };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -49,150 +38,84 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel = 'Sơ cấp 1' }) => {
     const navigation = useNavigation<NavigationProp>();
 
-    // Mock data
-    const allLessons: Lesson[] = [
-        {
-            id: 1,
-            code: 'BÀI 1',
-            title: '0 - 알파벳 Bảng chữ cái',
-            description: 'Tiếng Hàn sơ cấp 1',
-            level: 'Sơ cấp 1',
-            order: 1,
-            estimatedDuration: 60,
-            isPremium: false,
-            viewCount: 150,
-            completionCount: 120
-        },
-        {
-            id: 2,
-            code: 'BÀI 2',
-            title: '1 - 인사 Chào hỏi',
-            description: 'Tiếng Hàn sơ cấp 1',
-            level: 'Sơ cấp 1',
-            order: 2,
-            estimatedDuration: 75,
-            isPremium: false,
-            viewCount: 89,
-            completionCount: 67
-        },
-        {
-            id: 3,
-            code: 'BÀI 1',
-            title: '0 - 문법 기초 Ngữ pháp cơ bản',
-            description: 'Tiếng Hàn sơ cấp 2',
-            level: 'Sơ cấp 2',
-            order: 1,
-            estimatedDuration: 70,
-            isPremium: false,
-            viewCount: 134,
-            completionCount: 98
-        },
-        {
-            id: 4,
-            code: 'BÀI 2',
-            title: '1 - 일상 생활 Cuộc sống hàng ngày',
-            description: 'Tiếng Hàn sơ cấp 2',
-            level: 'Sơ cấp 2',
-            order: 2,
-            estimatedDuration: 80,
-            isPremium: true,
-            viewCount: 76,
-            completionCount: 45
-        },
-        {
-            id: 5,
-            code: 'BÀI 1',
-            title: '0 - 중급 문법 Ngữ pháp trung cấp',
-            description: 'Tiếng Hàn trung cấp 3',
-            level: 'Trung cấp 3',
-            order: 1,
-            estimatedDuration: 90,
-            isPremium: false,
-            viewCount: 65,
-            completionCount: 32
-        }
-    ];
-
-    const [filteredLessons, setFilteredLessons] = useState<Lesson[]>([]);
-    const [selectedLessons, setSelectedLessons] = useState<Set<number>>(new Set());
+    const [lessons, setLessons] = useState<Lesson[]>([]);
+    const [selectedLessons, setSelectedLessons] = useState<Set<string>>(new Set());
     const [isSelectAll, setIsSelectAll] = useState<boolean>(false);
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    // Lọc bài học theo level được chọn
+    // Load bài học từ API
+    const loadLessons = async () => {
+        try {
+            setIsLoading(true);
+            const response = await lessonService.getLessons({ level: selectedLevel });
+            setLessons(response.lessons);
+        } catch (error: any) {
+            console.error('Error loading lessons:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể tải danh sách bài học');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const filtered = allLessons.filter(lesson => lesson.level === selectedLevel);
-        setFilteredLessons(filtered);
-        setSelectedLessons(new Set());
-        setIsSelectAll(false);
+        loadLessons();
     }, [selectedLevel]);
 
     // Check if all lessons are selected
     useEffect(() => {
-        if (filteredLessons.length > 0 && selectedLessons.size === filteredLessons.length) {
+        if (lessons.length > 0 && selectedLessons.size === lessons.length) {
             setIsSelectAll(true);
         } else {
             setIsSelectAll(false);
         }
-    }, [selectedLessons, filteredLessons]);
+    }, [selectedLessons, lessons]);
 
     const handleAddLesson = (): void => {
-        // Lấy danh sách order hiện có
-        const existingOrders = filteredLessons.map(l => l.order).sort((a, b) => a - b);
-
-        // Tìm số nhỏ nhất bị thiếu
-        let newOrder = 1;
-        for (let i = 0; i < existingOrders.length; i++) {
-            if (existingOrders[i] !== i + 1) {
-                newOrder = i + 1;
-                break;
-            }
-            newOrder = existingOrders.length + 1; // nếu không thiếu số nào
-        }
-
-        const newLesson: Lesson = {
-            id: Date.now(),
-            code: `BÀI ${newOrder}`,
-            title: `Bài mới ${newOrder}`,
-            description: 'Mô tả bài học mới',
-            level: selectedLevel,
-            order: newOrder,
-            estimatedDuration: 60,
-            isPremium: false,
-            viewCount: 0,
-            completionCount: 0,
-        };
-
-        setFilteredLessons(prev => [...prev, newLesson].sort((a, b) => a.order - b.order));
+        setIsAdding(true);
+        setEditingLesson(null);
+        setIsModalOpen(true);
     };
 
-    const handleEditLesson = (lessonId: number): void => {
-        const lesson = filteredLessons.find(l => l.id === lessonId);
+    const handleEditLesson = (lessonId: string): void => {
+        const lesson = lessons.find(l => l._id === lessonId);
         setEditingLesson(lesson || null);
         setIsAdding(false);
         setIsModalOpen(true);
     };
 
-    const handleSaveLesson = (
-    formData: Omit<Lesson, 'id' | 'viewCount' | 'completionCount'>
-    ): void => {
-        if (isAdding) {
-            const newLesson: Lesson = {
-                id: Date.now(),
-                ...formData,
-                level: selectedLevel,
-                estimatedDuration: 60,
-                viewCount: 0,
-                completionCount: 0
-            };
-            setFilteredLessons(prev => [...prev, newLesson]);
-        } else if (editingLesson) {
-            setFilteredLessons(prev => 
-                prev.map(l => l.id === editingLesson.id ? { ...l, ...formData } : l)
-            );
+    const handleSaveLesson = async (
+        formData: Omit<Lesson, '_id' | 'viewCount' | 'completionCount' | 'author'>
+    ): Promise<void> => {
+        try {
+            if (isAdding) {
+                // Tạo mới bài học
+                const newLessonData = {
+                    ...formData,
+                    level: selectedLevel,
+                };
+                
+                const savedLesson = await lessonService.createLesson(newLessonData);
+                setLessons(prev => [...prev, savedLesson]);
+                Alert.alert('Thành công', 'Đã tạo bài học mới');
+            } else if (editingLesson && editingLesson._id) {
+                // Cập nhật bài học
+                const updatedLesson = await lessonService.updateLesson(
+                    editingLesson._id, 
+                    formData
+                );
+                setLessons(prev => 
+                    prev.map(l => l._id === editingLesson._id ? updatedLesson : l)
+                );
+                Alert.alert('Thành công', 'Đã cập nhật bài học');
+            }
+            setIsModalOpen(false);
+        } catch (error: any) {
+            console.error('Error saving lesson:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể lưu bài học');
         }
-        setIsModalOpen(false);
     };
 
     const handleCloseModal = (): void => {
@@ -201,21 +124,28 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         setIsAdding(false);
     };
 
-    const handleDeleteLesson = (lessonId: number): void => {
+    const handleDeleteLesson = (lessonId: string): void => {
         Alert.alert(
             'Xác nhận xóa',
-            'Bạn có chắc chắn muốn xóa bài học này?',
+            'Bạn có chắc chắn muốn xóa bài học này vĩnh viễn?',
             [
                 { text: 'Hủy', style: 'cancel' },
                 {
                     text: 'Xóa',
-                    onPress: () => {
-                        setFilteredLessons(prev => prev.filter(l => l.id !== lessonId));
-                        setSelectedLessons(prev => {
-                            const newSelected = new Set(prev);
-                            newSelected.delete(lessonId);
-                            return newSelected;
-                        });
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await lessonService.deleteLesson(lessonId);
+                            setLessons(prev => prev.filter(l => l._id !== lessonId));
+                            setSelectedLessons(prev => {
+                                const newSelected = new Set(prev);
+                                newSelected.delete(lessonId);
+                                return newSelected;
+                            });
+                            Alert.alert('Thành công', 'Đã xóa bài học');
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể xóa bài học');
+                        }
                     }
                 }
             ]
@@ -228,29 +158,38 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
             return;
         }
 
-        // Nếu có bài học được chọn → hiện popup xác nhận xóa
         Alert.alert(
             'Xác nhận xóa',
-            `Bạn có chắc chắn muốn xóa ${selectedLessons.size} bài học?`,
+            `Bạn có chắc chắn muốn xóa ${selectedLessons.size} bài học vĩnh viễn?`,
             [
                 { text: 'Hủy', style: 'cancel' },
                 {
                     text: 'Xóa',
-                    onPress: () => {
-                        setFilteredLessons(prev => prev.filter(l => !selectedLessons.has(l.id)));
-                        setSelectedLessons(new Set());
-                        setIsSelectAll(false);
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const ids = Array.from(selectedLessons);
+                            const result = await lessonService.deleteMultipleLessons(ids);
+                            
+                            setLessons(prev => prev.filter(l => !selectedLessons.has(l._id!)));
+                            setSelectedLessons(new Set());
+                            setIsSelectAll(false);
+                            
+                            Alert.alert('Thành công', `Đã xóa ${result.deletedCount} bài học`);
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.message || 'Không thể xóa bài học');
+                        }
                     }
                 }
             ]
         );
     };
 
-    const handleViewDetails = (lessonId: number): void => {
+    const handleViewDetails = (lessonId: string): void => {
         navigation.navigate('LessonDetail', { lessonId });
     };
 
-    const handleSelectLesson = (lessonId: number): void => {
+    const handleSelectLesson = (lessonId: string): void => {
         setSelectedLessons(prev => {
             const newSelected = new Set(prev);
             if (newSelected.has(lessonId)) {
@@ -266,7 +205,7 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         if (isSelectAll) {
             setSelectedLessons(new Set());
         } else {
-            const allIds = new Set(filteredLessons.map(lesson => lesson.id));
+            const allIds = new Set(lessons.map(lesson => lesson._id!));
             setSelectedLessons(allIds);
         }
         setIsSelectAll(!isSelectAll);
@@ -286,24 +225,14 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         </TouchableOpacity>
     );
 
-    interface StatCardProps {
-        value: string | number;
-        label: string;
-        color: string;
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.light.primary} />
+                <Text style={styles.loadingText}>Đang tải bài học...</Text>
+            </View>
+        );
     }
-
-    const StatCard: React.FC<StatCardProps> = ({ value, label, color }) => (
-        <View style={[styles.statCard, { backgroundColor: color }]}>
-            <Text style={styles.statValue}>{value}</Text>
-            <Text style={styles.statLabel}>{label}</Text>
-        </View>
-    );
-
-    const getLevelColor = (level: string): string => {
-        if (level.includes('Sơ cấp')) return palette.success;
-        if (level.includes('Trung cấp')) return palette.warning;
-        return palette.error;
-    };
 
     return (
         <View style={styles.container}>
@@ -312,7 +241,7 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                 <View>
                     <Text style={styles.title}>BÀI HỌC - {selectedLevel}</Text>
                     <Text style={styles.subtitle}>
-                        {filteredLessons.length} bài học
+                        {lessons.length} bài học
                         {selectedLessons.size > 0 && ` • ${selectedLessons.size} đã chọn`}
                     </Text>
                 </View>
@@ -326,13 +255,15 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                         onPress={handleAddLesson}
                     />
 
-                    <Button
-                        title="Xóa hàng loạt"
-                        variant="danger"
-                        size="small"
-                        leftIcon={<HugeiconsIcon icon={Delete02Icon} size={16} color={palette.white} />}
-                        onPress={handleBulkDelete}
-                    />
+                    {selectedLessons.size > 0 && (
+                        <Button
+                            title={`Xóa (${selectedLessons.size})`}
+                            variant="danger"
+                            size="small"
+                            leftIcon={<HugeiconsIcon icon={Delete02Icon} size={16} color={palette.white} />}
+                            onPress={handleBulkDelete}
+                        />
+                    )}
                 </View>
             </View>
 
@@ -346,14 +277,13 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
 
             {/* Table Body */}
             <ScrollView style={styles.tableBody}>
-                {filteredLessons.length > 0 ? (
-                    filteredLessons.map((lesson) => {
-                        const isSelected = selectedLessons.has(lesson.id);
-                        const levelColor = getLevelColor(lesson.level);
+                {lessons.length > 0 ? (
+                    lessons.map((lesson) => {
+                        const isSelected = selectedLessons.has(lesson._id!);
                         
                         return (
                             <View
-                                key={lesson.id}
+                                key={lesson._id}
                                 style={[
                                     styles.tableRow,
                                     isSelected && styles.tableRowSelected
@@ -361,7 +291,7 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                             >
                                 <Checkbox 
                                     selected={isSelected} 
-                                    onPress={() => handleSelectLesson(lesson.id)} 
+                                    onPress={() => handleSelectLesson(lesson._id!)} 
                                 />
 
                                 <Text style={styles.lessonCode}>{lesson.code}</Text>
@@ -369,10 +299,8 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                                 <View style={styles.lessonInfo}>
                                     <Text style={styles.lessonTitle}>{lesson.title}</Text>
                                     <View style={styles.lessonMeta}>
-                                        <View style={[styles.levelBadge, { backgroundColor: levelColor + '20' }]}>
-                                            <Text style={[styles.levelText, { color: levelColor }]}>
-                                                {lesson.level}
-                                            </Text>
+                                        <View style={styles.levelBadge}>
+                                            <Text style={styles.levelText}>{lesson.level}</Text>
                                         </View>
                                         {lesson.isPremium && (
                                             <View style={styles.premiumBadge}>
@@ -381,26 +309,25 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                                         )}
                                     </View>
                                     <Text style={styles.lessonDescription}>{lesson.description}</Text>
-                                    <Text style={styles.lessonStats}>{lesson.viewCount} lượt xem</Text>
                                 </View>
 
                                 <View style={styles.columnActions}>
                                     <TouchableOpacity
-                                        onPress={() => handleViewDetails(lesson.id)}
+                                        onPress={() => handleViewDetails(lesson._id!)}
                                         style={styles.actionBtn}
                                     >
                                         <HugeiconsIcon icon={EyeIcon} size={20} color={colors.light.primary} />
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                        onPress={() => handleEditLesson(lesson.id)}
+                                        onPress={() => handleEditLesson(lesson._id!)}
                                         style={styles.actionBtn}
                                     >
                                         <HugeiconsIcon icon={Edit01Icon} size={20} color={palette.warning} />
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                        onPress={() => handleDeleteLesson(lesson.id)}
+                                        onPress={() => handleDeleteLesson(lesson._id!)}
                                         style={styles.actionBtn}
                                     >
                                         <HugeiconsIcon icon={Delete02Icon} size={20} color={palette.error} />
@@ -424,37 +351,6 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                 )}
             </ScrollView>
 
-            {/* Statistics */}
-            {filteredLessons.length > 0 && (
-                <View style={styles.statistics}>
-                    <View style={styles.statsGrid}>
-                        <StatCard 
-                            value={filteredLessons.length} 
-                            label="Tổng bài học" 
-                            color={palette.blue + '15'} 
-                        />
-                        <StatCard 
-                            value={filteredLessons.filter(lesson => !lesson.isPremium).length} 
-                            label="Bài miễn phí" 
-                            color={palette.success + '15'} 
-                        />
-                        <StatCard 
-                            value={filteredLessons.filter(lesson => lesson.isPremium).length} 
-                            label="Bài Premium" 
-                            color={palette.purple + '15'} 
-                        />
-                        <StatCard 
-                            value={`${Math.round(
-                                filteredLessons.reduce((acc, lesson) => acc + lesson.completionCount, 0) / 
-                                Math.max(filteredLessons.reduce((acc, lesson) => acc + lesson.viewCount, 0), 1) * 100
-                            )}%`} 
-                            label="Tỷ lệ hoàn thành" 
-                            color={palette.orange + '15'} 
-                        />
-                    </View>
-                </View>
-            )}
-
             {/* Modal */}
             <ModalLesson
                 isVisible={isModalOpen}
@@ -469,6 +365,17 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: colors.light.textSecondary,
     },
     header: {
         flexDirection: 'row',
@@ -504,7 +411,7 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         flexShrink: 3,
         flexBasis: '1%',
-        fontSize: typography.fontSizes.sm,
+        fontSize: typography.fontSizes.xs,
         fontFamily: typography.fonts.semiBold,
         color: colors.light.text,
     },
@@ -553,8 +460,9 @@ const styles = StyleSheet.create({
         color: colors.light.primary,
     },
     lessonInfo: {
-        flex: 3,
+        flex: 15,
         marginHorizontal: 12,
+
     },
     lessonTitle: {
         fontSize: typography.fontSizes.sm,
@@ -568,6 +476,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     levelBadge: {
+        backgroundColor: palette.success + '20',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 12,
@@ -575,6 +484,7 @@ const styles = StyleSheet.create({
     levelText: {
         fontSize: typography.fontSizes.xs,
         fontFamily: typography.fonts.semiBold,
+        color: palette.success,
     },
     premiumBadge: {
         backgroundColor: palette.purple + '20',
@@ -593,14 +503,10 @@ const styles = StyleSheet.create({
         marginBottom: 4,
         fontFamily: typography.fonts.regular,
     },
-    lessonStats: {
-        fontSize: typography.fontSizes.xs,
-        color: colors.light.textSecondary,
-        fontFamily: typography.fonts.regular,
-    },
     columnActions: {
         flexDirection: 'column',
         gap: 4,
+        flex: 1
     },
     actionBtn: {
         padding: 8,
@@ -615,34 +521,6 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         textAlign: 'center',
         fontFamily: typography.fonts.regular,
-    },
-    statistics: {
-        marginTop: 24,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: colors.light.border,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    statCard: {
-        flex: 1,
-        alignItems: 'center',
-        padding: 16,
-        borderRadius: 12,
-    },
-    statValue: {
-        fontSize: typography.fontSizes.lg,
-        fontFamily: typography.fonts.bold,
-        color: colors.light.text,
-        marginBottom: 4,
-    },
-    statLabel: {
-        fontSize: typography.fontSizes.xs,
-        fontFamily: typography.fonts.regular,
-        color: colors.light.textSecondary,
-        textAlign: 'center',
     },
 });
 

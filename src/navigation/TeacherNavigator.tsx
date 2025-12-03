@@ -24,10 +24,16 @@ import LessonDetailScreen from '../screens/Teacher/TeacherLessonsScreen/LessonDe
 import TeacherExamsDetail from '../screens/Teacher/TeacherExamsScreen/TeacherExamsDetail';
 import TeacherCultureDetail from '../screens/Teacher/TeacherCultureScreen/TeacherCultureDetail';
 
+import TeacherProfileScreen from '../screens/Teacher/TeacherProfileScreen/TeacherProfileScreen'; 
+
 type TeacherStackParamList = {
   TeacherMain: undefined;
   LessonDetail: { lessonId: number };
+  ExamDetail: { examId: string };
+  CultureDetail: { cultureId: string };
+  TeacherProfile: undefined; 
 };
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -89,11 +95,11 @@ const TeacherTabs = () => {
         component={TeacherCultureScreen} 
         options={{ tabBarLabel: 'Văn hóa' }} 
       />
-      <Tab.Screen 
+      {/* <Tab.Screen 
         name="TeacherNews" 
         component={TeacherNewsScreen} 
         options={{ tabBarLabel: 'Tin tức' }} 
-      />
+      /> */}
       <Tab.Screen 
         name="TeacherSetting" 
         component={SettingScreen} 
@@ -133,6 +139,14 @@ const TeacherNavigator = () => {
         component={TeacherCultureDetail}
         options={{ 
           title: 'Chi tiết văn hóa',
+          headerBackTitle: 'Quay lại'
+        }}
+      />
+      <Stack.Screen 
+        name="TeacherProfile" 
+        component={TeacherProfileScreen}
+        options={{ 
+          title: 'Hồ sơ cá nhân',
           headerBackTitle: 'Quay lại'
         }}
       />

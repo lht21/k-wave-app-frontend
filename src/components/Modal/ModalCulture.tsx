@@ -1,63 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
+  View, Text, TextInput, ScrollView, TouchableOpacity, Modal,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import {
-  Cancel01Icon,
-  PlusSignIcon,
-  Delete02Icon,
-  FolderIcon,
-} from '@hugeicons/core-free-icons';
+import { Cancel01Icon, Delete02Icon, FolderIcon } from '@hugeicons/core-free-icons';
 import * as ImagePicker from 'expo-image-picker';
-import Button from '../../components/Button/Button';
+import Button from '../Button/Button'; // Chỉnh lại đường dẫn import nếu cần
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-
-// --- TYPES ---
-type ContentType = 'text' | 'image';
-
-interface ContentItem {
-  type: ContentType;
-  content: string;
-  url?: string;
-  caption?: string;
-  localImage?: any;
-}
-
-interface VocabularyItem {
-  word: string;
-  meaning: string;
-  pronunciation: string;
-}
-
-interface CultureData {
-  id?: number;
-  title: string;
-  subtitle: string;
-  category: string;
-  image: any;
-  icon: string;
-  content: ContentItem[];
-  vocabulary: VocabularyItem[];
-}
+import { cultureService, Culture } from '../../services/cultureService';
 
 interface ModalCultureProps {
   isOpen: boolean;
   onClose: () => void;
   mode: 'add' | 'edit';
-  onSave: (data: CultureData) => void;
-  culture?: CultureData | null;
+  onSave: (data: Partial<Culture>) => void;
+  culture?: Culture | null;
 }
 
 const categories = [
@@ -67,438 +26,272 @@ const categories = [
 ];
 
 const ModalCulture: React.FC<ModalCultureProps> = ({
-  isOpen,
-  onClose,
-  mode,
-  onSave,
-  culture
+  isOpen, onClose, mode, onSave, culture
 }) => {
-  const [formData, setFormData] = useState<CultureData>({
-    title: '',
-    subtitle: '',
-    category: 'Ứng xử',
-    image: null,
-    icon: '',
+  const [formData, setFormData] = useState<Partial<Culture>>({
+    title: '', subtitle: '', category: 'Ứng xử',
+    image: '', icon: '',
     content: [{ type: 'text', content: '' }],
     vocabulary: [{ word: '', meaning: '', pronunciation: '' }]
   });
+  
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (culture) {
       setFormData(culture);
     } else {
-      // Reset form when adding new
-      setFormData({
-        title: '',
-        subtitle: '',
-        category: 'Ứng xử',
-        image: null,
-        icon: '',
-        content: [{ type: 'text', content: '' }],
-        vocabulary: [{ word: '', meaning: '', pronunciation: '' }]
-      });
+      resetForm();
     }
   }, [culture, isOpen]);
 
-  // Request permissions khi component mount
-  useEffect(() => {
-    (async () => {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập thư viện ảnh để chọn hình ảnh.');
+  const resetForm = () => {
+    setFormData({
+      title: '', subtitle: '', category: 'Ứng xử',
+      image: '', icon: '',
+      content: [{ type: 'text', content: '' }],
+      vocabulary: [{ word: '', meaning: '', pronunciation: '' }]
+    });
+  };
+
+  const handleImagePick = async (field: 'image' | 'contentImage', contentIndex?: number) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const localUri = result.assets[0].uri;
+        
+        // Upload ngay lập tức
+        setUploading(true);
+        try {
+          console.log('📤 Uploading image...', localUri);
+          const serverUrl = await cultureService.uploadImage(localUri);
+          console.log('✅ Upload success:', serverUrl);
+
+          if (field === 'image') {
+            setFormData(prev => ({ ...prev, image: serverUrl }));
+          } else if (field === 'contentImage' && contentIndex !== undefined) {
+            const newContent = [...(formData.content || [])];
+            newContent[contentIndex] = {
+              ...newContent[contentIndex],
+              url: serverUrl // Lưu URL từ server
+            };
+            setFormData(prev => ({ ...prev, content: newContent }));
+          }
+        } catch (error: any) {
+          Alert.alert('Lỗi Upload', error.message || 'Không thể upload ảnh lên server');
+        } finally {
+          setUploading(false);
+        }
       }
-    })();
-  }, []);
+    } catch (error) {
+      console.error('Error picking image:', error);
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = () => {
-    // Validate required fields
-    if (!formData.title.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề');
-      return;
-    }
-    if (!formData.subtitle.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mô tả ngắn');
+    if (!formData.title?.trim() || !formData.subtitle?.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề và mô tả');
       return;
     }
     if (!formData.image) {
-      Alert.alert('Lỗi', 'Vui lòng chọn hình ảnh chính');
-      return;
-    }
-    if (formData.content.some(item => item.type === 'text' && !item.content.trim())) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ nội dung văn bản');
-      return;
-    }
-    if (formData.vocabulary.some(vocab => !vocab.word.trim() || !vocab.meaning.trim())) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ từ và nghĩa cho từ vựng');
+      Alert.alert('Lỗi', 'Vui lòng upload hình ảnh chính');
       return;
     }
 
     onSave(formData);
   };
 
-  const handleImagePick = async (field: 'image' | 'contentImage', contentIndex?: number) => {
-    try {
-      let result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      console.log('Image picker result:', result);
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const imageAsset = result.assets[0];
-        
-        if (field === 'image') {
-          setFormData(prev => ({
-            ...prev,
-            image: { uri: imageAsset.uri }
-          }));
-        } else if (field === 'contentImage' && contentIndex !== undefined) {
-          const newContent = [...formData.content];
-          newContent[contentIndex] = {
-            ...newContent[contentIndex],
-            url: imageAsset.uri,
-            localImage: { uri: imageAsset.uri }
-          };
-          setFormData(prev => ({ ...prev, content: newContent }));
-        }
-        
-        Alert.alert('Thành công', 'Đã chọn hình ảnh thành công');
-      } else if (result.canceled) {
-        console.log('User cancelled image picker');
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Lỗi', 'Không thể chọn hình ảnh. Vui lòng thử lại.');
-    }
-  };
-
-  const handleContentChange = (index: number, field: keyof ContentItem, value: string) => {
-    const newContent = [...formData.content];
+  // Helper functions for content manipulation
+  const updateContent = (index: number, field: string, value: string) => {
+    const newContent = [...(formData.content || [])];
     newContent[index] = { ...newContent[index], [field]: value };
-    setFormData(prev => ({ ...prev, content: newContent }));
+    setFormData({ ...formData, content: newContent });
   };
 
-  const addContent = (type: ContentType) => {
-    setFormData(prev => ({
-      ...prev,
-      content: [...prev.content, { type, content: '', url: '', caption: '' }]
-    }));
+  const addContent = (type: 'text' | 'image') => {
+    setFormData({
+      ...formData,
+      content: [...(formData.content || []), { type, content: '', url: '', caption: '' }]
+    });
   };
 
   const removeContent = (index: number) => {
-    if (formData.content.length <= 1) {
-      Alert.alert('Lỗi', 'Phải có ít nhất một phần nội dung');
-      return;
-    }
-    
-    const newContent = formData.content.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, content: newContent }));
+    const newContent = (formData.content || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, content: newContent });
   };
 
-  const handleVocabularyChange = (index: number, field: keyof VocabularyItem, value: string) => {
-    const newVocabulary = [...formData.vocabulary];
-    newVocabulary[index] = { ...newVocabulary[index], [field]: value };
-    setFormData(prev => ({ ...prev, vocabulary: newVocabulary }));
+  // Helper functions for vocabulary
+  const updateVocab = (index: number, field: string, value: string) => {
+    const newVocab = [...(formData.vocabulary || [])];
+    newVocab[index] = { ...newVocab[index], [field] : value } as any;
+    setFormData({ ...formData, vocabulary: newVocab });
   };
 
-  const addVocabulary = () => {
-    setFormData(prev => ({
-      ...prev,
-      vocabulary: [...prev.vocabulary, { word: '', meaning: '', pronunciation: '' }]
-    }));
+  const addVocab = () => {
+    setFormData({
+      ...formData,
+      vocabulary: [...(formData.vocabulary || []), { word: '', meaning: '', pronunciation: '' }]
+    });
   };
 
-  const removeVocabulary = (index: number) => {
-    if (formData.vocabulary.length <= 1) {
-      Alert.alert('Lỗi', 'Phải có ít nhất một từ vựng');
-      return;
-    }
-    
-    const newVocabulary = formData.vocabulary.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, vocabulary: newVocabulary }));
+  const removeVocab = (index: number) => {
+    const newVocab = (formData.vocabulary || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, vocabulary: newVocab });
   };
 
   if (!isOpen) return null;
 
   return (
-    <Modal
-      visible={isOpen}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+    <Modal visible={isOpen} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
-            {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>
-                {mode === 'add' ? 'Thêm Bài Văn Hóa Mới' : 'Chỉnh Sửa Bài Văn Hóa'}
-              </Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <HugeiconsIcon icon={Cancel01Icon} size={24} color={colors.light.textSecondary} />
-              </TouchableOpacity>
+              <Text style={styles.headerTitle}>{mode === 'add' ? 'Thêm Bài Văn Hóa' : 'Sửa Bài Văn Hóa'}</Text>
+              <TouchableOpacity onPress={onClose}><HugeiconsIcon icon={Cancel01Icon} size={24} color={colors.light.text} /></TouchableOpacity>
             </View>
 
-            <ScrollView 
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Thông tin cơ bản */}
-              <View style={styles.section}>                
-                <View style={styles.formRow}>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Tiêu đề <Text style={styles.required}>*</Text></Text>
-                    <TextInput
-                      value={formData.title}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-                      style={styles.textInput}
-                      placeholder="Nhập tiêu đề..."
-                      placeholderTextColor={colors.light.textSecondary}
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Thể loại <Text style={styles.required}>*</Text></Text>
-                    <View style={styles.pickerContainer}>
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.categoryScroll}
-                      >
-                        <View style={styles.categoryContainer}>
-                          {categories.map(category => (
-                            <TouchableOpacity
-                              key={category}
-                              style={[
-                                styles.categoryChip,
-                                formData.category === category && styles.categoryChipActive
-                              ]}
-                              onPress={() => setFormData(prev => ({ ...prev, category }))}
-                            >
-                              <Text style={[
-                                styles.categoryChipText,
-                                formData.category === category && styles.categoryChipTextActive
-                              ]}>
-                                {category}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </ScrollView>
-                    </View>
-                  </View>
+            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+              {/* Image Upload Status */}
+              {uploading && (
+                <View style={styles.uploadingBanner}>
+                  <ActivityIndicator size="small" color={palette.primary} />
+                  <Text style={styles.uploadingText}>Đang upload ảnh lên server...</Text>
                 </View>
+              )}
 
-                <View style={styles.formRow}>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Mô tả ngắn <Text style={styles.required}>*</Text></Text>
-                    <TextInput
-                      value={formData.subtitle}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, subtitle: text }))}
-                      style={styles.textInput}
-                      placeholder="Nhập mô tả ngắn..."
-                      placeholderTextColor={colors.light.textSecondary}
-                      multiline
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Hình ảnh chính <Text style={styles.required}>*</Text></Text>
-                    <TouchableOpacity 
-                      style={styles.imagePicker}
-                      onPress={() => handleImagePick('image')}
-                    >
-                      {formData.image ? (
-                        <Image source={formData.image} style={styles.selectedImage} />
-                      ) : (
-                        <View style={styles.imagePlaceholder}>
-                          <HugeiconsIcon icon={FolderIcon} size={32} color={colors.light.textSecondary} />
-                          <Text style={styles.imagePlaceholderText}>Chọn hình ảnh</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>URL icon</Text>
-                    <TextInput
-                      value={formData.icon}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, icon: text }))}
-                      style={styles.textInput}
-                      placeholder="/icons/culture/example.svg"
-                      placeholderTextColor={colors.light.textSecondary}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Nội dung chi tiết */}
+              {/* Main Info */}
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Nội dung</Text>
-                  <View style={styles.sectionActions}>
-                    <Button 
-                      title="Thêm văn bản"
-                      variant="primary"
-                      size="small"
-                      onPress={() => addContent('text')}
-                                        />
-                    <Button 
-                      title="Thêm ảnh"
-                      variant="primary"
-                      size="small"
-                      onPress={() => addContent('image')}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.contentList}>
-                  {formData.content.map((item, index) => (
-                    <View key={index} style={styles.contentItem}>
-                      <View style={styles.contentHeader}>
-                        <Text style={styles.contentType}>
-                          {item.type === 'text' ? 'Văn bản' : 'Hình ảnh'}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => removeContent(index)}
-                          style={styles.deleteButton}
-                        >
-                          <HugeiconsIcon icon={Delete02Icon} size={16} color={palette.error} />
-                        </TouchableOpacity>
-                      </View>
-
-                      {item.type === 'text' ? (
-                        <TextInput
-                          value={item.content}
-                          onChangeText={(text) => handleContentChange(index, 'content', text)}
-                          style={[styles.textInput, styles.textArea]}
-                          placeholder="Nhập nội dung văn bản..."
-                          placeholderTextColor={colors.light.textSecondary}
-                          multiline
-                          numberOfLines={4}
-                          textAlignVertical="top"
-                        />
-                      ) : (
-                        <View style={styles.imageInputs}>
-                          <TouchableOpacity 
-                            style={styles.imagePicker}
-                            onPress={() => handleImagePick('contentImage', index)}
-                          >
-                            {item.localImage || item.url ? (
-                              <Image 
-                                source={item.localImage || { uri: item.url }} 
-                                style={styles.selectedImage} 
-                              />
-                            ) : (
-                              <View style={styles.imagePlaceholder}>
-                                <HugeiconsIcon icon={FolderIcon} size={24} color={colors.light.textSecondary} />
-                                <Text style={styles.imagePlaceholderText}>Chọn hình ảnh</Text>
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                          <TextInput
-                            value={item.caption}
-                            onChangeText={(text) => handleContentChange(index, 'caption', text)}
-                            style={styles.textInput}
-                            placeholder="Chú thích hình ảnh"
-                            placeholderTextColor={colors.light.textSecondary}
-                          />
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Từ vựng liên quan */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Từ vựng liên quan</Text>
-                  <Button 
-                    title="Thêm từ vựng"
-                    variant="primary"
-                    size="small"
-                    onPress={addVocabulary}
-                  />
-                </View>
-
-                <View style={styles.vocabularyList}>
-                  {formData.vocabulary.map((vocab, index) => (
-                    <View key={index} style={styles.vocabularyItem}>
-                      <View style={styles.vocabularyHeader}>
-                        <Text style={styles.vocabularyTitle}>Từ vựng #{index + 1}</Text>
-                        <TouchableOpacity
-                          onPress={() => removeVocabulary(index)}
-                          style={styles.deleteButton}
-                        >
-                          <HugeiconsIcon icon={Delete02Icon} size={16} color={palette.error} />
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <View style={styles.vocabularyInputs}>
-                        <View style={styles.inputGroup}>
-                          <Text style={styles.smallLabel}>Từ <Text style={styles.required}>*</Text></Text>
-                          <TextInput
-                            value={vocab.word}
-                            onChangeText={(text) => handleVocabularyChange(index, 'word', text)}
-                            style={styles.textInput}
-                            placeholder="Nhập từ..."
-                            placeholderTextColor={colors.light.textSecondary}
-                          />
-                        </View>
-                        
-                        <View style={styles.inputGroup}>
-                          <Text style={styles.smallLabel}>Nghĩa <Text style={styles.required}>*</Text></Text>
-                          <TextInput
-                            value={vocab.meaning}
-                            onChangeText={(text) => handleVocabularyChange(index, 'meaning', text)}
-                            style={styles.textInput}
-                            placeholder="Nhập nghĩa..."
-                            placeholderTextColor={colors.light.textSecondary}
-                          />
-                        </View>
-                        
-                        <View style={styles.inputGroup}>
-                          <Text style={styles.smallLabel}>Phát âm</Text>
-                          <TextInput
-                            value={vocab.pronunciation}
-                            onChangeText={(text) => handleVocabularyChange(index, 'pronunciation', text)}
-                            style={styles.textInput}
-                            placeholder="Nhập phát âm..."
-                            placeholderTextColor={colors.light.textSecondary}
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionSection}>
-                <Button 
-                  title="Hủy"
-                  variant="primary"
-                  onPress={onClose}
-                  />
-                <Button 
-                  title={mode === 'add' ? 'Thêm Bài Văn Hóa' : 'Lưu Thay Đổi'}
-                  variant="primary"
-                  size='small'
-                  onPress={handleSubmit}
+                <Text style={styles.label}>Tiêu đề *</Text>
+                <TextInput 
+                  style={styles.input} 
+                  value={formData.title} 
+                  onChangeText={t => setFormData({...formData, title: t})}
+                  placeholder="Nhập tiêu đề"
                 />
+
+                <Text style={styles.label}>Mô tả ngắn *</Text>
+                <TextInput 
+                  style={[styles.input, { height: 60 }]} 
+                  multiline 
+                  value={formData.subtitle} 
+                  onChangeText={t => setFormData({...formData, subtitle: t})}
+                  placeholder="Nhập mô tả ngắn"
+                />
+
+                <Text style={styles.label}>Thể loại</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                  {categories.map(cat => (
+                    <TouchableOpacity 
+                      key={cat} 
+                      style={[styles.chip, formData.category === cat && styles.activeChip]}
+                      onPress={() => setFormData({...formData, category: cat})}
+                    >
+                      <Text style={[styles.chipText, formData.category === cat && styles.activeChipText]}>{cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.label}>Hình ảnh chính (Bìa) *</Text>
+                <TouchableOpacity style={styles.imagePicker} onPress={() => handleImagePick('image')} disabled={uploading}>
+                  {formData.image ? (
+                    <Image source={{ uri: formData.image }} style={styles.imagePreview} />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <HugeiconsIcon icon={FolderIcon} size={32} color={colors.light.textSecondary} />
+                      <Text style={{ color: colors.light.textSecondary }}>Chọn ảnh bìa</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
+
+              {/* Content Section */}
+              <View style={styles.section}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.sectionTitle}>Nội dung bài viết</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Button title="+ Text" size="small" onPress={() => addContent('text')} />
+                    <Button title="+ Ảnh" size="small" onPress={() => addContent('image')} />
+                  </View>
+                </View>
+
+                {formData.content?.map((item, index) => (
+                  <View key={index} style={styles.cardItem}>
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.itemLabel}>{item.type === 'text' ? 'Đoạn văn' : 'Hình ảnh'}</Text>
+                      <TouchableOpacity onPress={() => removeContent(index)}>
+                        <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {item.type === 'text' ? (
+                      <TextInput 
+                        style={[styles.input, { height: 80 }]} 
+                        multiline 
+                        value={item.content}
+                        onChangeText={t => updateContent(index, 'content', t)}
+                        placeholder="Nội dung đoạn văn..."
+                      />
+                    ) : (
+                      <>
+                        <TouchableOpacity 
+                          style={styles.imagePickerSmall} 
+                          onPress={() => handleImagePick('contentImage', index)}
+                          disabled={uploading}
+                        >
+                          {item.url ? (
+                            <Image source={{ uri: item.url }} style={styles.imagePreviewSmall} />
+                          ) : (
+                            <Text style={{ color: colors.light.textSecondary }}>+ Upload ảnh minh họa</Text>
+                          )}
+                        </TouchableOpacity>
+                        <TextInput 
+                          style={[styles.input, { marginTop: 8 }]}
+                          value={item.caption}
+                          onChangeText={t => updateContent(index, 'caption', t)}
+                          placeholder="Chú thích ảnh (tùy chọn)"
+                        />
+                      </>
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* Vocabulary Section */}
+              <View style={styles.section}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.sectionTitle}>Từ vựng</Text>
+                  <Button title="+ Thêm từ" size="small" onPress={addVocab} />
+                </View>
+                {formData.vocabulary?.map((vocab, index) => (
+                  <View key={index} style={styles.cardItem}>
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.itemLabel}>Từ vựng {index + 1}</Text>
+                      <TouchableOpacity onPress={() => removeVocab(index)}>
+                        <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TextInput style={[styles.input, { flex: 1 }]} placeholder="Từ (Hàn)" value={vocab.word} onChangeText={t => updateVocab(index, 'word', t)} />
+                      <TextInput style={[styles.input, { flex: 1 }]} placeholder="Nghĩa (Việt)" value={vocab.meaning} onChangeText={t => updateVocab(index, 'meaning', t)} />
+                    </View>
+                    <TextInput style={styles.input} placeholder="Phát âm" value={vocab.pronunciation} onChangeText={t => updateVocab(index, 'pronunciation', t)} />
+                  </View>
+                ))}
+              </View>
+
             </ScrollView>
+
+            <View style={styles.footer}>
+              <Button title="Hủy" variant="outline" onPress={onClose} disabled={uploading} />
+              <Button title={uploading ? "Đang xử lý..." : "Lưu"} variant="primary" onPress={handleSubmit} disabled={uploading} />
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -506,221 +299,37 @@ const ModalCulture: React.FC<ModalCultureProps> = ({
   );
 };
 
-// Styles giữ nguyên...
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: colors.light.background,
-    borderRadius: 12,
-    width: '100%',
-    maxHeight: '90%',
-    shadowColor: colors.light.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
-  },
-  headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontFamily: typography.fonts.semiBold,
-    color: colors.light.text,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  scrollView: {
-    maxHeight: '100%',
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSizes.md,
-    fontFamily: typography.fonts.semiBold,
-    color: colors.light.text,
-  },
-  sectionActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  formRow: {
-    gap: 16,
-    marginBottom: 16,
-  },
-  inputGroup: {
-    flex: 1,
-  },
-  label: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.text,
-    marginBottom: 8,
-  },
-  smallLabel: {
-    fontSize: typography.fontSizes.xs,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.textSecondary,
-    marginBottom: 4,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: typography.fontSizes.sm,
-    color: colors.light.text,
-    backgroundColor: colors.light.card,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    borderRadius: 8,
-    backgroundColor: colors.light.card,
-  },
-  categoryScroll: {
-    maxHeight: 50,
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    padding: 8,
-    gap: 8,
-  },
-  categoryChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: colors.light.background,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.light.primary,
-    borderColor: colors.light.primary,
-  },
-  categoryChipText: {
-    fontSize: typography.fontSizes.xs,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.text,
-  },
-  categoryChipTextActive: {
-    color: colors.light.white,
-    fontFamily: typography.fonts.regular,
-  },
-  imagePicker: {
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    borderRadius: 8,
-    backgroundColor: colors.light.card,
-    overflow: 'hidden',
-  },
-  imagePlaceholder: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.light.background,
-  },
-  imagePlaceholderText: {
-    marginTop: 8,
-    fontSize: typography.fontSizes.sm,
-    color: colors.light.textSecondary,
-    fontFamily: typography.fonts.regular,
-  },
-  selectedImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  contentList: {
-    gap: 16,
-  },
-  contentItem: {
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: colors.light.card,
-  },
-  contentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  contentType: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.text,
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  imageInputs: {
-    gap: 12,
-  },
-  vocabularyList: {
-    gap: 16,
-  },
-  vocabularyItem: {
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: colors.light.card,
-  },
-  vocabularyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  vocabularyTitle: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.regular,
-    color: colors.light.text,
-  },
-  vocabularyInputs: {
-    gap: 12,
-  },
-  actionSection: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.light.border,
-  },
-    required: { color: palette.error },
+  container: { flex: 1 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 16 },
+  modal: { backgroundColor: colors.light.background, borderRadius: 12, maxHeight: '90%', flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: colors.light.border },
+  headerTitle: { fontSize: 18, fontFamily: typography.fonts.bold },
+  contentContainer: { padding: 16 },
+  section: { marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontFamily: typography.fonts.bold, marginBottom: 8 },
+  label: { fontSize: 14, fontFamily: typography.fonts.semiBold, marginBottom: 6, color: colors.light.text },
+  input: { borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, padding: 10, marginBottom: 12, backgroundColor: colors.light.card },
+  
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.light.border, marginRight: 8, backgroundColor: colors.light.card },
+  activeChip: { backgroundColor: colors.light.primary, borderColor: colors.light.primary },
+  chipText: { fontSize: 12, color: colors.light.text },
+  activeChipText: { color: 'white' },
+
+  imagePicker: { height: 150, borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginBottom: 12, overflow: 'hidden' },
+  imagePlaceholder: { alignItems: 'center' },
+  imagePreview: { width: '100%', height: '100%' },
+
+  cardItem: { backgroundColor: colors.light.card, padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: colors.light.border },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  itemLabel: { fontSize: 14, fontFamily: typography.fonts.bold, color: colors.light.primary },
+
+  imagePickerSmall: { height: 100, borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  imagePreviewSmall: { width: '100%', height: '100%', borderRadius: 8 },
+
+  footer: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1, borderColor: colors.light.border, justifyContent: 'flex-end' },
+  uploadingBanner: { flexDirection: 'row', alignItems: 'center', padding: 8, backgroundColor: colors.light.primary + '15', marginBottom: 10, borderRadius: 6 },
+  uploadingText: { marginLeft: 8, fontSize: 12, color: colors.light.primary }
 });
 
 export default ModalCulture;

@@ -1,7 +1,7 @@
 // screens/Setting/SettingScreen.tsx
-import React from 'react';
-import { View, ScrollView, Alert, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback } from 'react'; // Thêm useCallback
+import { View, ScrollView, Alert, TouchableOpacity, Text, StyleSheet, Image } from 'react-native'; // Thêm Image
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Thêm useFocusEffect
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
@@ -30,12 +30,21 @@ type RootStackParamList = {
   Home: undefined;
   Profile: undefined;
 };
+type TeacherStackParamList = {
+  TeacherProfile: undefined;
+};
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = StackNavigationProp<any>;
 
 const SettingScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, refreshUser } = useAuth(); 
+  // Tự động reload thông tin khi quay lại màn hình này
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -81,7 +90,7 @@ const SettingScreen = () => {
       title: 'Thông tin cá nhân', 
       icon: UserIcon,
       description: 'Quản lý thông tin tài khoản',
-      onPress: () => console.log('Thông tin cá nhân') // Tạm thời comment navigation
+      onPress: () => navigation.navigate('TeacherProfile') 
     },
     { 
       title: 'Thông báo', 
@@ -151,19 +160,20 @@ const SettingScreen = () => {
       {/* User Info Card */}
       <View style={styles.userCard}>
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {getInitials(user?.fullName || 'Người dùng')}
-            </Text>
+          {/* Sửa lại logic hiển thị Avatar */}
+          {user?.avatar && user.avatar !== 'default-avatar-url' ? (
+             <Image 
+                source={{ uri: user.avatar }} 
+                style={styles.avatarImage} // Nhớ thêm style này bên dưới
+             />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {getInitials(user?.fullName || 'Người dùng')}
+              </Text>
+            </View>
+          )}
           </View>
-          <View style={styles.verifiedBadge}>
-            <HugeiconsIcon 
-              icon={SecurityWifiIcon} 
-              size={12} 
-              color={palette.white}
-            />
-          </View>
-        </View>
         
         <View style={styles.userInfo}>
           <Text style={styles.userName}>
@@ -179,6 +189,7 @@ const SettingScreen = () => {
           </View>
         </View>
       </View>
+
 
       {/* Tài khoản */}
       <View style={styles.section}>
@@ -368,6 +379,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+    avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.light.gray100, // Màu nền giữ chỗ
+    borderWidth: 1,
+    borderColor: colors.light.gray100,
+  },
+
   avatarText: {
     fontFamily: typography.fonts.bold,
     fontSize: 20,

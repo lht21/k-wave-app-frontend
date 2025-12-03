@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,11 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system'; // Thêm import này
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -24,10 +27,19 @@ import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { SpeakingLesson } from '../Modal/ModalSpeaking';
+import { speakingService } from '../../services/speakingService';
 
 interface SpeakingPracticeProps {
   lesson: SpeakingLesson;
   onBack: () => void;
+}
+
+// Tạo interface cho audio file trong React Native
+interface AudioFile {
+  uri: string;
+  name: string;
+  type: string;
+  size?: number;
 }
 
 const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) => {
@@ -36,9 +48,12 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
   
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [recordedAudio, setRecordedAudio] = useState<AudioFile | null>(null); // Đổi type
   
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
 
   // Timer Logic
   useEffect(() => {
@@ -46,7 +61,15 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
     
     if (status === 'preparing' || status === 'recording') {
       if (timeLeft > 0) {
-        timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+        timer = setInterval(() => {
+          setTimeLeft((prev) => {
+            const newTime = prev - 1;
+            if (status === 'recording') {
+              setRecordingDuration(lesson.recordingLimit - newTime);
+            }
+            return newTime;
+          });
+        }, 1000);
       } else {
         if (status === 'preparing') {
           startRecording(); 
@@ -66,13 +89,15 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
     };
   }, []);
 
-  // --- AUDIO ACTIONS ---
-
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status === 'granted') {
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        await Audio.setAudioModeAsync({ 
+          allowsRecordingIOS: true, 
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false 
+        });
         
         if (sound) {
           await sound.unloadAsync();
@@ -85,7 +110,8 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
         
         setRecording(newRecording);
         setStatus('recording');
-        setTimeLeft(lesson.recordingLimit); 
+        setTimeLeft(lesson.recordingLimit);
+        setRecordingDuration(0); // Reset duration
       } else {
         Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền Microphone để ghi âm.');
       }
@@ -95,35 +121,56 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
     }
   };
 
-  const stopRecording = async () => {
-    if (!recording) return;
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecordingUri(uri);
-      setRecording(null);
-      setStatus('finished');
-    } catch (error) {
-      console.error(error);
+const stopRecording = async () => {
+  if (!recording) return;
+  try {
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecordingUri(uri);
+    
+    // Lấy thông tin file trong React Native
+    if (uri) {
+      // Xác định extension và MIME type dựa trên platform
+      const isIOS = Platform.OS === 'ios';
+      const extension = isIOS ? 'm4a' : 'aac';
+      const mimeType = isIOS ? 'audio/x-m4a' : 'audio/aac';
+      
+      // Tạo object audio file cho React Native
+      const audioFile: AudioFile = {
+        uri: uri,
+        name: `recording-${Date.now()}.${extension}`,
+        type: mimeType,
+        size: 0 // Tạm thời set 0, có thể tính sau nếu cần
+      };
+      
+      setRecordedAudio(audioFile);
+      console.log('✅ Audio file created:', {
+        name: audioFile.name,
+        type: audioFile.type,
+        size: audioFile.size
+      });
     }
-  };
+    
+    setRecording(null);
+    setStatus('finished');
+  } catch (error) {
+    console.error('Error stopping recording:', error);
+    Alert.alert('Lỗi', 'Không thể dừng ghi âm.');
+  }
+};
 
-  // --- FIX LỖI LẶP LẠI Ở ĐÂY ---
-  const playRecordedAudio = async () => {
+const playRecordedAudio = async () => {
     if (!recordingUri) return;
     try {
       if (sound) {
-        // Nếu đã có sound, xử lý Play/Pause
         if (isPlaying) {
           await sound.pauseAsync();
           setIsPlaying(false);
         } else {
-          // Nếu đang pause hoặc stop, playAsync sẽ phát tiếp hoặc phát từ đầu
           await sound.playAsync();
           setIsPlaying(true);
         }
       } else {
-        // Nếu chưa có sound, tạo mới
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: recordingUri },
           { shouldPlay: true }
@@ -134,9 +181,7 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
         newSound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             setIsPlaying(false);
-            // FIX: Dùng stopAsync() thay vì setPositionAsync(0)
-            // stopAsync() sẽ tua về 0 VÀ dừng hẳn việc tự động phát lại
-            newSound.stopAsync(); 
+            newSound.stopAsync();
           }
         });
       }
@@ -151,7 +196,6 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
       {
         text: 'Đồng ý',
         onPress: async () => {
-          // Dừng audio nếu đang phát
           if (sound) {
             await sound.unloadAsync();
             setSound(null);
@@ -159,15 +203,47 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
           setStatus('preparing');
           setTimeLeft(lesson.duration);
           setRecordingUri(null);
+          setRecordedAudio(null);
           setIsPlaying(false);
+          setRecordingDuration(0);
         }
       }
     ]);
   };
 
-  const handleSubmit = () => {
-    Alert.alert('Thành công', 'Bài nói của bạn đã được nộp!');
-    onBack();
+  const handleSubmit = async () => {
+    if (!recordedAudio || !recordingUri) {
+      Alert.alert('Lỗi', 'Không có bản ghi âm để nộp');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      console.log('📤 Starting submission...');
+      console.log('📤 Audio file:', recordedAudio);
+      console.log('📤 Recording duration:', recordingDuration);
+      
+      // 1. Upload audio
+      const uploadResult = await speakingService.uploadAudio(recordedAudio);
+      console.log('✅ Upload result:', uploadResult);
+      
+      // 2. Submit speaking
+      await speakingService.submitSpeaking(lesson._id, {
+        audioUrl: uploadResult.audioUrl,
+        recordingDuration: recordingDuration || lesson.recordingLimit,
+        wordCount: 0,
+        fileSize: recordedAudio.size || 0
+      });
+      
+      Alert.alert('Thành công', 'Bài nói của bạn đã được nộp!');
+      onBack();
+    } catch (error: any) {
+      console.error('❌ Submission error:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể nộp bài');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatTime = (s: number) => {
@@ -279,11 +355,20 @@ const SpeakingPractice: React.FC<SpeakingPracticeProps> = ({ lesson, onBack }) =
                   leftIcon={<HugeiconsIcon icon={RecordIcon} size={20} color={colors.light.text} />}
                 />
                 <Button
-                  title="Nộp bài"
+                  title={submitting ? "Đang nộp..." : "Nộp bài"}
                   onPress={handleSubmit}
                   variant="primary"
-                  leftIcon={<HugeiconsIcon icon={SentIcon} size={20} color="white" />}
-                />
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <HugeiconsIcon icon={SentIcon} size={20} color="white" style={{ marginRight: 8 }} />
+                      <Text style={{ color: 'white' }}>Nộp bài</Text>
+                    </View>
+                  )}
+                </Button>
               </View>
             </View>
           )}
@@ -357,9 +442,7 @@ const styles = StyleSheet.create({
 
   controls: { paddingBottom: 32 },
   finishedControls: { gap: 12 },
-  row: { flexDirection: 'row', gap: 12,   justifyContent: 'space-around', 
-  alignItems: 'center',
- },
+  row: { flexDirection: 'row', gap: 12, justifyContent: 'space-around', alignItems: 'center' },
 });
 
 export default SpeakingPractice;

@@ -52,3 +52,14 @@ export interface ExamResult {
   timeLimit?: number; // seconds
   completedAt: Date;
 }
+export interface CreateExamData {
+  title: string;               // BẮT BUỘC
+  description?: string;
+  examType: 'topik1' | 'topik2' | 'esp';
+  category: 'official' | 'practice';
+  listening: number;
+  reading: number;
+  writing: number;
+  duration: number;
+  isPremium: boolean;
+}
