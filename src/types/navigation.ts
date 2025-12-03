@@ -39,6 +39,7 @@ export type RootStackParamList = {
     itemId: string;
     itemTitle: string;
   };
+  CultureTestDemo: undefined;
 
   // News screens
   NewsDetail: {
@@ -73,4 +74,6 @@ export type MainTabParamList = {
 export type SettingStackParamList = {
   Dashboard: undefined;
   Settings: undefined;
+  UserProfile: undefined;
+  EditProfile: undefined;
 };

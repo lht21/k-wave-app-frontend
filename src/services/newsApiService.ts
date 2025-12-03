@@ -109,12 +109,14 @@ export interface NewsSearchParams {
 
 class NewsApiService {
   private baseUrl: string;
+  private koreanNewsUrl: string;
 
   constructor() {
     this.baseUrl = `${API_BASE_URL}/news`;
+    this.koreanNewsUrl = `${API_BASE_URL}/korean-news`;
   }
 
-  // Get all news with filtering and pagination
+  // Get all news with filtering and pagination - now uses Korean news API
   async getAllNews(params: NewsSearchParams = {}): Promise<NewsListResponse> {
     const queryParams = new URLSearchParams();
     
@@ -124,37 +126,77 @@ class NewsApiService {
       }
     });
 
-    const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `${this.koreanNewsUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch news: ${response.statusText}`);
+    try {
+      const response = await fetchWithTimeout(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch news: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Korean news API failed, falling back to original endpoint:', error);
+      
+      // Fallback to original endpoint if Korean news API fails
+      const fallbackUrl = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const fallbackResponse = await fetchWithTimeout(fallbackUrl);
+      
+      if (!fallbackResponse.ok) {
+        throw new Error(`Failed to fetch news: ${fallbackResponse.statusText}`);
+      }
+      
+      return fallbackResponse.json();
     }
-    
-    return response.json();
   }
 
   // Get news by ID with full content
   async getNewsById(id: string): Promise<NewsDetailResponse> {
-    const response = await fetch(`${this.baseUrl}/${id}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch news article: ${response.statusText}`);
+    try {
+      const response = await fetchWithTimeout(`${this.koreanNewsUrl}/${id}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch news article: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Korean news API failed, falling back to original endpoint:', error);
+      
+      // Fallback to original endpoint
+      const fallbackResponse = await fetchWithTimeout(`${this.baseUrl}/${id}`);
+      
+      if (!fallbackResponse.ok) {
+        throw new Error(`Failed to fetch news article: ${fallbackResponse.statusText}`);
+      }
+      
+      return fallbackResponse.json();
     }
-    
-    return response.json();
   }
 
   // Get recent news
   async getRecentNews(limit: number = 20): Promise<NewsListResponse> {
-    const response = await fetch(`${this.baseUrl}/recent?limit=${limit}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch recent news: ${response.statusText}`);
+    try {
+      const response = await fetchWithTimeout(`${this.koreanNewsUrl}/recent?limit=${limit}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recent news: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Korean news API failed, falling back to original endpoint:', error);
+      
+      // Fallback to original endpoint
+      const fallbackResponse = await fetchWithTimeout(`${this.baseUrl}/recent?limit=${limit}`);
+      
+      if (!fallbackResponse.ok) {
+        throw new Error(`Failed to fetch recent news: ${fallbackResponse.statusText}`);
+      }
+      
+      return fallbackResponse.json();
     }
-    
-    return response.json();
   }
 
   // Get news by category

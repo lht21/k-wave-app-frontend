@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +7,9 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image,
-  TextInput 
+  TextInput,
+  RefreshControl,
+  ActivityIndicator 
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -14,6 +17,8 @@ import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { RootStackParamList } from '../../types/navigation';
+import { useVideosByCategory, useVideoSearch } from '../../hooks/useYouTube';
+import youtubeApiService, { YouTubeVideo } from '../../services/youtubeApiService';
 
 type VideoCategoryNavigationProp = StackNavigationProp<RootStackParamList>;
 type VideoCategoryRouteProp = RouteProp<RootStackParamList, 'VideoCategory'>;
@@ -24,124 +29,82 @@ const VideoCategory: React.FC = () => {
   const { categoryId, categoryTitle } = route.params;
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
 
-  // Mock data cho tất cả video trong danh mục
-  const allVideos = [
-    {
-      id: 'v1',
-      title: 'Things You Don\'t Want to on a Holiday',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '10:05',
-      views: '2567',
-      level: 'beginner',
-      description: 'Học các từ vựng và cụm từ phổ biến khi đi du lịch'
-    },
-    {
-      id: 'v2',
-      title: 'Korean Daily Conversation',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '08:30',
-      views: '1845',
-      level: 'intermediate',
-      description: 'Những cuộc hội thoại thông dụng trong cuộc sống hàng ngày'
-    },
-    {
-      id: 'v3',
-      title: 'Learning Korean Grammar',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '12:15',
-      views: '3201',
-      level: 'advanced',
-      description: 'Ngữ pháp tiếng Hàn cơ bản và nâng cao'
-    },
-    {
-      id: 'v4',
-      title: 'Korean Culture Introduction',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '15:42',
-      views: '2890',
-      level: 'beginner',
-      description: 'Giới thiệu về văn hóa và truyền thống Hàn Quốc'
-    },
-    {
-      id: 'v5',
-      title: 'K-pop Vocabulary',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '09:20',
-      views: '5432',
-      level: 'beginner',
-      description: 'Từ vựng thường gặp trong các bài hát K-pop'
-    },
-    {
-      id: 'v6',
-      title: 'Korean Food Names',
-      thumbnail: 'https://via.placeholder.com/120x80',
-      duration: '07:15',
-      views: '4321',
-      level: 'beginner',
-      description: 'Tên gọi các món ăn Hàn Quốc phổ biến'
+  // Use YouTube API hooks - limit to 6 videos for 2 rows
+  const { videos: categoryVideos, loading: categoryLoading, refresh: refreshCategory } = useVideosByCategory(categoryId, 6);
+  const { videos: searchResults, loading: searchLoading, searchVideos, clearSearch } = useVideoSearch();
+
+  // Determine which videos to show - limit to 6 videos maximum
+  const displayVideos = (isSearchMode ? searchResults : categoryVideos).slice(0, 6);
+  const isLoading = isSearchMode ? searchLoading : categoryLoading;
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setIsSearchMode(true);
+      const timeoutId = setTimeout(() => {
+        searchVideos(searchQuery, 6);
+      }, 500); // Debounce search
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      setIsSearchMode(false);
+      clearSearch();
     }
-  ];
+  }, [searchQuery]);
 
-  const filteredVideos = allVideos.filter(video =>
-    video.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleVideoPress = (video: any) => {
+  const handleVideoPress = (video: YouTubeVideo) => {
     navigation.navigate('VideoDetail', {
       videoId: video.id,
       videoTitle: video.title
     });
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'beginner': return '#4CAF50';
-      case 'intermediate': return '#FF9800';
-      case 'advanced': return '#F44336';
-      default: return '#6B7280';
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (isSearchMode && searchQuery.trim()) {
+      await searchVideos(searchQuery, 6);
+    } else {
+      await refreshCategory();
     }
+    setRefreshing(false);
   };
 
-  const getLevelText = (level: string) => {
-    switch (level) {
-      case 'beginner': return 'Cơ bản';
-      case 'intermediate': return 'Trung bình';
-      case 'advanced': return 'Nâng cao';
-      default: return 'Trung bình';
-    }
+  const handleSearchClear = () => {
+    setSearchQuery('');
+    setIsSearchMode(false);
+    clearSearch();
   };
 
-  const VideoListItem = ({ video }: { video: any }) => (
+  const VideoListItem = ({ video }: { video: YouTubeVideo }) => (
     <TouchableOpacity 
-      style={styles.videoItem}
+      style={styles.videoItemGrid}
       onPress={() => handleVideoPress(video)}
     >
-      <View style={styles.thumbnailContainer}>
+      <View style={styles.thumbnailContainerGrid}>
         <Image 
-          source={{ uri: video.thumbnail }} 
-          style={styles.thumbnail}
+          source={{ uri: youtubeApiService.getVideoThumbnail(video, 'medium') }} 
+          style={styles.thumbnailGrid}
           resizeMode="cover"
+          defaultSource={{ uri: 'https://via.placeholder.com/120x80?text=KBS+Drama' }}
         />
         <View style={styles.durationBadge}>
           <Text style={styles.durationText}>{video.duration}</Text>
         </View>
-        <View style={styles.playButton}>
+        <View style={styles.playButtonGrid}>
           <Text style={styles.playIcon}>▶</Text>
         </View>
       </View>
       
-      <View style={styles.videoContent}>
-        <Text style={styles.videoTitle} numberOfLines={2}>
+      <View style={styles.videoContentGrid}>
+        <Text style={styles.videoTitleGrid} numberOfLines={2}>
           {video.title}
         </Text>
-        <Text style={styles.videoDescription} numberOfLines={2}>
-          {video.description}
-        </Text>
-        <View style={styles.videoMeta}>
-          <Text style={styles.views}>👁 {video.views}</Text>
-          <View style={[styles.levelBadge, { backgroundColor: getLevelColor(video.level) }]}>
-            <Text style={styles.levelText}>{getLevelText(video.level)}</Text>
+        <View style={styles.videoMetaGrid}>
+          <Text style={styles.viewsSmall}>👁 {video.viewCount}</Text>
+          <View style={[styles.levelBadgeSmall, { backgroundColor: youtubeApiService.getLevelColor(video.level) }]}>
+            <Text style={styles.levelTextSmall}>{youtubeApiService.getLevelText(video.level)}</Text>
           </View>
         </View>
       </View>
@@ -176,7 +139,7 @@ const VideoCategory: React.FC = () => {
           {searchQuery.length > 0 && (
             <TouchableOpacity 
               style={styles.clearButton}
-              onPress={() => setSearchQuery('')}
+              onPress={handleSearchClear}
             >
               <Text style={styles.clearIcon}>✕</Text>
             </TouchableOpacity>
@@ -184,24 +147,56 @@ const VideoCategory: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#269a56ff']}
+            tintColor="#269a56ff"
+          />
+        }
+      >
         {/* Video Count */}
-        <Text style={styles.videoCount}>
-          {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''}
-        </Text>
+        {!isLoading && (
+          <Text style={styles.videoCount}>
+            {displayVideos.length} video{displayVideos.length !== 1 ? 's' : ''} (hiển thị tối đa 6)
+            {isSearchMode && ` cho "${searchQuery}"`}
+          </Text>
+        )}
 
-        {/* Videos List */}
-        <View style={styles.videosList}>
-          {filteredVideos.map((video) => (
-            <VideoListItem key={video.id} video={video} />
-          ))}
-        </View>
+        {/* Loading State */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#269a56ff" />
+            <Text style={styles.loadingText}>
+              {isSearchMode ? `Đang tìm kiếm "${searchQuery}"...` : 'Đang tải video...'}
+            </Text>
+          </View>
+        )}
+
+        {/* Videos Grid - 2 rows, 3 columns */}
+        {!isLoading && (
+          <View style={styles.videosGrid}>
+            {displayVideos.map((video, index) => (
+              <View key={video.id} style={styles.videoGridItem}>
+                <VideoListItem video={video} />
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Empty State */}
-        {filteredVideos.length === 0 && (
+        {!isLoading && displayVideos.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Không tìm thấy video nào</Text>
-            <Text style={styles.emptySubtext}>Thử tìm kiếm với từ khóa khác</Text>
+            <Text style={styles.emptyText}>
+              {isSearchMode ? `Không tìm thấy video nào cho "${searchQuery}"` : 'Không có video nào'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {isSearchMode ? 'Thử tìm kiếm với từ khóa khác' : 'Vui lòng thử lại sau'}
+            </Text>
           </View>
         )}
 
@@ -306,7 +301,80 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
 
-  // Videos List
+  // Videos Grid
+  videosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs
+  },
+  videoGridItem: {
+    width: '31%', // 3 columns with small gaps
+    marginBottom: spacing.md
+  },
+  videoItemGrid: {
+    backgroundColor: palette.white,
+    borderRadius: 8,
+    padding: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2
+  },
+  thumbnailContainerGrid: {
+    position: 'relative',
+    marginBottom: spacing.xs
+  },
+  thumbnailGrid: {
+    width: '100%',
+    height: 60,
+    borderRadius: 6
+  },
+  playButtonGrid: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -8 }, { translateY: -8 }],
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  videoContentGrid: {
+    flex: 1
+  },
+  videoTitleGrid: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.light.text,
+    marginBottom: spacing.xs,
+    lineHeight: 14
+  },
+  videoMetaGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  viewsSmall: {
+    fontSize: 10,
+    color: '#6B7280'
+  },
+  levelBadgeSmall: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4
+  },
+  levelTextSmall: {
+    fontSize: 8,
+    color: palette.white,
+    fontWeight: '600'
+  },
+
+  // Videos List (keep original for compatibility)
   videosList: {
     marginTop: spacing.sm
   },
@@ -415,5 +483,18 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#999'
+  },
+
+  // Loading States
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxxl,
+    marginHorizontal: spacing.md
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: spacing.md,
+    fontWeight: '500'
   }
 });

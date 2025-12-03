@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -23,6 +24,52 @@ const StdSkillPractice: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getMockDataForSkill = (skill: string) => {
+    switch (skill) {
+      case 'vocabulary':
+        return [
+          {
+            korean: '안녕하세요',
+            vietnamese: 'Xin chào',
+            pronunciation: 'annyeonghaseyo'
+          },
+          {
+            korean: '감사합니다',
+            vietnamese: 'Cảm ơn',
+            pronunciation: 'gamsahamnida'
+          },
+          {
+            korean: '죄송합니다',
+            vietnamese: 'Xin lỗi',
+            pronunciation: 'joesonghamnida'
+          }
+        ];
+      case 'grammar':
+        return [
+          {
+            pattern: '이/가 (chủ ngữ)',
+            meaning: 'Trợ từ chỉ chủ ngữ trong câu',
+            example: '저는 학생이에요',
+            usage: 'Dùng sau danh từ để chỉ chủ ngữ'
+          }
+        ];
+      case 'listening':
+      case 'reading':
+      case 'speaking':
+      case 'writing':
+        return [
+          {
+            question: `Câu hỏi luyện tập ${skill}`,
+            options: ['Đáp án A', 'Đáp án B', 'Đáp án C', 'Đáp án D'],
+            correct: 0,
+            explanation: `Giải thích cho bài tập ${skill}`
+          }
+        ];
+      default:
+        return [];
+    }
+  };
+
   useEffect(() => {
     loadSkillData();
   }, [lessonId, skillType]);
@@ -42,20 +89,43 @@ const StdSkillPractice: React.FC = () => {
       const lessonData = await lessonApiService.getLesson(lessonId);
       
       console.log('Lesson data received:', lessonData);
-      console.log('Available skills in lesson:', Object.keys(lessonData || {}));
-      console.log(`${skillType} data:`, lessonData?.[skillType]);
+      console.log('Available content in lesson:', Object.keys(lessonData?.content || {}));
       
-      if (lessonData && lessonData[skillType] && lessonData[skillType].length > 0) {
-        setSkillData(lessonData[skillType]);
-        console.log(`Loaded ${lessonData[skillType].length} ${skillType} items`);
+      // Map skillType to lesson content structure
+      let skillContent: any[] = [];
+      
+      if (lessonData?.content) {
+        switch (skillType) {
+          case 'vocabulary':
+            skillContent = lessonData.content.vocabulary || [];
+            break;
+          case 'grammar':
+            skillContent = lessonData.content.grammar || [];
+            break;
+          case 'listening':
+          case 'reading':
+          case 'speaking':
+          case 'writing':
+            skillContent = lessonData.content.exercises || [];
+            break;
+          default:
+            skillContent = lessonData.content.vocabulary || [];
+        }
+      }
+      
+      console.log(`${skillType} content:`, skillContent);
+      
+      if (skillContent && skillContent.length > 0) {
+        setSkillData(skillContent);
+        console.log(`Loaded ${skillContent.length} ${skillType} items`);
       } else {
-        console.log('No skill data found or empty array, using fallback');
-        setSkillData([]);
+        console.log('No content found, using mock data for', skillType);
+        setSkillData(getMockDataForSkill(skillType));
       }
     } catch (error) {
       console.error('Error loading skill data:', error);
-      setError('Không thể tải nội dung bài học');
-      setSkillData([]);
+      console.log('Using mock data due to error for', skillType);
+      setSkillData(getMockDataForSkill(skillType));
     } finally {
       setLoading(false);
     }
@@ -95,9 +165,9 @@ const StdSkillPractice: React.FC = () => {
     return (
       <View style={styles.contentCard}>
         <View style={styles.vocabularyCard}>
-          <Text style={styles.koreanText}>{vocab.koreanWord || vocab.korean}</Text>
+          <Text style={styles.koreanText}>{vocab.korean || vocab.koreanWord || 'Từ vựng'}</Text>
           <Text style={styles.pronunciationText}>{vocab.pronunciation || ''}</Text>
-          <Text style={styles.vietnameseText}>{vocab.vietnameseMeaning || vocab.vietnamese}</Text>
+          <Text style={styles.vietnameseText}>{vocab.vietnamese || vocab.vietnameseMeaning || 'Nghĩa tiếng Việt'}</Text>
           {vocab.examples && vocab.examples.length > 0 && (
             <View style={styles.examplesSection}>
               <Text style={styles.examplesTitle}>Ví dụ:</Text>
@@ -135,8 +205,18 @@ const StdSkillPractice: React.FC = () => {
     return (
       <View style={styles.contentCard}>
         <View style={styles.grammarCard}>
-          <Text style={styles.grammarPattern}>{grammar.structure || grammar.pattern}</Text>
-          <Text style={styles.grammarMeaning}>{grammar.explanation || grammar.meaning}</Text>
+          <Text style={styles.grammarPattern}>{grammar.pattern || grammar.structure || 'Mẫu ngữ pháp'}</Text>
+          <Text style={styles.grammarMeaning}>{grammar.meaning || grammar.explanation || 'Giải thích ngữ pháp'}</Text>
+          
+          {grammar.example && (
+            <View style={styles.examplesSection}>
+              <Text style={styles.examplesTitle}>Ví dụ:</Text>
+              <View style={styles.exampleItem}>
+                <Text style={styles.exampleKorean}>{grammar.example}</Text>
+                <Text style={styles.exampleVietnamese}>{grammar.usage || ''}</Text>
+              </View>
+            </View>
+          )}
           
           {grammar.exampleSentences && grammar.exampleSentences.length > 0 && (
             <View style={styles.examplesSection}>
@@ -159,11 +239,11 @@ const StdSkillPractice: React.FC = () => {
   };
 
   const renderQuestionContent = () => {
-    // Placeholder for questions - would be loaded from skill data
-    const question = {
+    // Use actual data from skillData if available, otherwise use placeholder
+    const question = skillData.length > 0 ? skillData[currentIndex % skillData.length] : {
       question: 'Câu hỏi sẽ được load từ API',
       options: ['Đáp án A', 'Đáp án B', 'Đáp án C', 'Đáp án D'],
-      correctAnswer: 0,
+      correct: 0,
       explanation: 'Giải thích sẽ được load từ API'
     };
     
@@ -173,14 +253,14 @@ const StdSkillPractice: React.FC = () => {
           <Text style={styles.questionText}>{question.question}</Text>
           
           <View style={styles.optionsContainer}>
-            {question.options.map((option, index) => (
+            {question.options.map((option: string, index: number) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.optionButton,
                   selectedAnswer === index && styles.selectedOption,
-                  showExplanation && index === question.correctAnswer && styles.correctOption,
-                  showExplanation && selectedAnswer === index && index !== question.correctAnswer && styles.wrongOption
+                  showExplanation && index === question.correct && styles.correctOption,
+                  showExplanation && selectedAnswer === index && index !== question.correct && styles.wrongOption
                 ]}
                 onPress={() => setSelectedAnswer(index)}
                 disabled={showExplanation}
@@ -188,7 +268,7 @@ const StdSkillPractice: React.FC = () => {
                 <Text style={[
                   styles.optionText,
                   selectedAnswer === index && styles.selectedOptionText,
-                  showExplanation && index === question.correctAnswer && styles.correctOptionText
+                  showExplanation && index === question.correct && styles.correctOptionText
                 ]}>
                   {String.fromCharCode(65 + index)}. {option}
                 </Text>

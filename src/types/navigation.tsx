@@ -16,6 +16,9 @@ export type RootStackParamList = {
   Setting: undefined;
   Profile: undefined;
   
+  // Demo screens
+  VocabularyPopupDemo: undefined;
+  
   // Learning screens
   StdRoadmap: undefined;
   StdLesson: { lessonId: string; lessonTitle: string };

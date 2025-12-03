@@ -1,4 +1,5 @@
-import React from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +7,9 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image, 
-  Dimensions 
+  Dimensions, 
+  RefreshControl,
+  ActivityIndicator 
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -14,6 +17,8 @@ import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { RootStackParamList } from '../../types/navigation';
+import { useLatestVideos, useTrendingVideos, useVideoCategories } from '../../hooks/useYouTube';
+import youtubeApiService, { YouTubeVideo } from '../../services/youtubeApiService';
 
 type StdVideoLearningNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -21,94 +26,56 @@ const { width } = Dimensions.get('window');
 
 const StdVideoLearning: React.FC = () => {
   const navigation = useNavigation<StdVideoLearningNavigationProp>();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock data cho các video
+  // Use YouTube API hooks
+  const { videos: latestVideos, loading: latestLoading, refresh: refreshLatest } = useLatestVideos(10);
+  const { videos: trendingVideos, loading: trendingLoading, refresh: refreshTrending } = useTrendingVideos(8);
+  const { categories, loading: categoriesLoading, refresh: refreshCategories } = useVideoCategories();
+
+  // Test API connection on mount
+  React.useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const result = await youtubeApiService.testConnection();
+        if (result.success) {
+          console.log('✅ API Connection OK:', result.url);
+        } else {
+          console.warn('⚠️ API Connection Failed:', result.message, 'URL:', result.url);
+        }
+      } catch (error) {
+        console.error('❌ Connection test error:', error);
+      }
+    };
+    testConnection();
+  }, []);
+
+  // Create video categories with real data
   const videoCategories = [
     {
       id: 'latest',
-      title: 'Video mới nhất',
-      videos: [
-        {
-          id: 'v1',
-          title: 'Things You Don\'t Want to on a Holiday',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '10:05',
-          views: '2567',
-          level: 'beginner'
-        },
-        {
-          id: 'v2',
-          title: 'Korean Daily Conversation',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '08:30',
-          views: '1845',
-          level: 'intermediate'
-        },
-        {
-          id: 'v3',
-          title: 'Learning Korean Grammar',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '12:15',
-          views: '3201',
-          level: 'advanced'
-        },
-        {
-          id: 'v4',
-          title: 'Korean Culture Introduction',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '15:42',
-          views: '2890',
-          level: 'beginner'
-        }
-      ]
+      title: 'Video mới nhất từ KBS Drama',
+      videos: latestVideos
     },
     {
-      id: 'news',
-      title: 'Video tin tức',
-      videos: [
-        {
-          id: 'vn1',
-          title: 'Korean News Today',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '05:30',
-          views: '1567',
-          level: 'advanced'
-        },
-        {
-          id: 'vn2',
-          title: 'Seoul Weather Report',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '03:45',
-          views: '987',
-          level: 'intermediate'
-        }
-      ]
+      id: 'trending', 
+      title: 'Video được xem nhiều',
+      videos: trendingVideos
     },
-    {
-      id: 'favorites',
-      title: 'Video được yêu thích',
-      videos: [
-        {
-          id: 'vf1',
-          title: 'K-pop Vocabulary',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '09:20',
-          views: '5432',
-          level: 'beginner'
-        },
-        {
-          id: 'vf2',
-          title: 'Korean Food Names',
-          thumbnail: 'https://via.placeholder.com/200x120',
-          duration: '07:15',
-          views: '4321',
-          level: 'beginner'
-        }
-      ]
-    }
+    ...categories.map(cat => ({
+      id: cat.id,
+      title: cat.title,
+      videos: cat.videos.slice(0, 6) // Limit to 6 videos per category
+    }))
   ];
 
-  const handleVideoPress = (video: any) => {
+  const handleVideoPress = (video: YouTubeVideo) => {
+    console.log('Navigating to video detail:', {
+      videoId: video.id,
+      videoTitle: video.title,
+      thumbnail: video.thumbnail
+    });
+    
     navigation.navigate('VideoDetail', {
       videoId: video.id,
       videoTitle: video.title
@@ -122,56 +89,61 @@ const StdVideoLearning: React.FC = () => {
     });
   };
 
-  const VideoCard = ({ video }: { video: any }) => (
-    <TouchableOpacity 
-      style={styles.videoCard}
-      onPress={() => handleVideoPress(video)}
-    >
-      <View style={styles.thumbnailContainer}>
-        <Image 
-          source={{ uri: video.thumbnail }} 
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{video.duration}</Text>
-        </View>
-        <View style={styles.playButton}>
-          <Text style={styles.playIcon}>▶</Text>
-        </View>
-      </View>
-      
-      <View style={styles.videoInfo}>
-        <Text style={styles.videoTitle} numberOfLines={2}>
-          {video.title}
-        </Text>
-        <View style={styles.videoMeta}>
-          <Text style={styles.views}>👁 {video.views}</Text>
-          <View style={[styles.levelBadge, { backgroundColor: getLevelColor(video.level) }]}>
-            <Text style={styles.levelText}>{getLevelText(video.level)}</Text>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refreshLatest(),
+      refreshTrending(),
+      refreshCategories()
+    ]);
+    setRefreshing(false);
+  };
+
+  const VideoCard = ({ video }: { video: YouTubeVideo }) => {
+    const thumbnailUrl = youtubeApiService.getVideoThumbnail(video, 'medium');
+    const fallbackUrl = `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.videoCard}
+        onPress={() => handleVideoPress(video)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.thumbnailContainer}>
+          <Image 
+            source={{ 
+              uri: thumbnailUrl || fallbackUrl
+            }} 
+            style={styles.thumbnail}
+            resizeMode="cover"
+            onError={() => {
+              console.log('Image load error for video:', video.id);
+            }}
+          />
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>{video.duration}</Text>
+          </View>
+          <View style={styles.playButton}>
+            <Text style={styles.playIcon}>▶</Text>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'beginner': return '#4CAF50';
-      case 'intermediate': return '#FF9800';
-      case 'advanced': return '#F44336';
-      default: return '#6B7280';
-    }
+        
+        <View style={styles.videoInfo}>
+          <Text style={styles.videoTitle} numberOfLines={2}>
+            {video.title}
+          </Text>
+          <View style={styles.videoMeta}>
+            <Text style={styles.views}>👁 {video.viewCount}</Text>
+            <View style={[styles.levelBadge, { backgroundColor: youtubeApiService.getLevelColor(video.level) }]}>
+              <Text style={styles.levelText}>{youtubeApiService.getLevelText(video.level)}</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  const getLevelText = (level: string) => {
-    switch (level) {
-      case 'beginner': return 'Cơ bản';
-      case 'intermediate': return 'Trung bình';
-      case 'advanced': return 'Nâng cao';
-      default: return 'Trung bình';
-    }
-  };
+  const isLoading = latestLoading || trendingLoading || categoriesLoading;
 
   return (
     <View style={styles.container}>
@@ -209,30 +181,51 @@ const StdVideoLearning: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#269a56ff']}
+            tintColor="#269a56ff"
+          />
+        }
+      >
+        {/* Loading State */}
+        {isLoading && videoCategories.every(cat => cat.videos.length === 0) && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#269a56ff" />
+            <Text style={styles.loadingText}>Đang tải video từ KBS Drama...</Text>
+          </View>
+        )}
+
         {/* Video Categories */}
         {videoCategories.map((category) => (
-          <View key={category.id} style={styles.categorySection}>
-            <View style={styles.categoryHeader}>
-              <Text style={styles.categoryTitle}>{category.title}</Text>
-              <TouchableOpacity 
-                style={styles.seeMoreButton}
-                onPress={() => handleSeeMore(category.id, category.title)}
-              >
-                <Text style={styles.seeMoreText}>Xem thêm</Text>
-              </TouchableOpacity>
-            </View>
+          category.videos.length > 0 && (
+            <View key={category.id} style={styles.categorySection}>
+              <View style={styles.categoryHeader}>
+                <Text style={styles.categoryTitle}>{category.title}</Text>
+                <TouchableOpacity 
+                  style={styles.seeMoreButton}
+                  onPress={() => handleSeeMore(category.id, category.title)}
+                >
+                  <Text style={styles.seeMoreText}>Xem thêm</Text>
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.videosContainer}
-            >
-              {category.videos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-            </ScrollView>
-          </View>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.videosContainer}
+              >
+                {category.videos.map((video) => (
+                  <VideoCard key={video.id} video={video} />
+                ))}
+              </ScrollView>
+            </View>
+          )
         ))}
 
         {/* Bottom spacing */}
@@ -488,5 +481,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: palette.white,
     fontWeight: '600'
+  },
+
+  // Loading States
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxxl,
+    marginHorizontal: spacing.md
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: spacing.md,
+    fontWeight: '500'
   }
 });

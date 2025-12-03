@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, FlatList, ImageBackground } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { spacing } from '../../theme/spacing'
@@ -97,6 +97,12 @@ const HomeStd: React.FC = () => {
             <Text style={styles.greetingSubtitle}>Mỗi ngày một bước, chinh phục tiếng Hàn dễ dàng!</Text>
           </View>
         </View>
+        <TouchableOpacity 
+          style={styles.testBtn}
+          onPress={() => (navigation as any).navigate('CultureTestDemo')}
+        >
+          <Text style={styles.testBtnText}>🧪</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.signUpBtn}>
           <Text style={styles.signUpText}>Đăng ký ngay!</Text>
         </TouchableOpacity>
@@ -361,6 +367,21 @@ const styles = StyleSheet.create({
   // Upgrade Button
   upgradeBtn: { backgroundColor: '#FF6B35', paddingVertical: spacing.md, borderRadius: 8, alignItems: 'center' },
   upgradeBtnText: { color: palette.white, fontWeight: '700', fontSize: typography.fontSizes.md },
+
+  // Test Button
+  testBtn: { 
+    backgroundColor: '#269a56ff', 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginHorizontal: 8 
+  },
+  testBtnText: { 
+    fontSize: 18,
+    color: palette.white 
+  },
 
   // Culture Card
   cultureCard: { backgroundColor: colors.light.card, borderRadius: 12, padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.light.border },

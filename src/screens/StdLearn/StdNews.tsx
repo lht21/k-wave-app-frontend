@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import * as React from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Platform, Alert, Dimensions, ActivityIndicator, RefreshControl } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
@@ -21,9 +22,6 @@ const StdNews: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedSource, setSelectedSource] = useState('all')
   const [selectedFavorite, setSelectedFavorite] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [displayDate, setDisplayDate] = useState(new Date().toLocaleDateString('vi-VN'))
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [showSourceDropdown, setShowSourceDropdown] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -102,18 +100,13 @@ const StdNews: React.FC = () => {
     { id: 'economy', name: '경제', icon: '💰' }
   ]
 
-  // Korean news sources
+  // Korean news sources - only main 4 sources
   const sources = [
     { id: 'all', name: '전체', icon: '📰' },
-    { id: '조선일보', name: '조선일보', icon: '📄' },
-    { id: '중앙일보', name: '중앙일보', icon: '📰' },
-    { id: '동아일보', name: '동아일보', icon: '📃' },
-    { id: '한겨레', name: '한겨레', icon: '📑' },
-    { id: 'KBS', name: 'KBS', icon: '📺' },
-    { id: 'MBC', name: 'MBC', icon: '📻' },
     { id: 'SBS', name: 'SBS', icon: '📺' },
     { id: '연합뉴스', name: '연합뉴스', icon: '🗞️' },
-    { id: 'YTN', name: 'YTN', icon: '📢' }
+    { id: 'KBS', name: 'KBS', icon: '📺' },
+    { id: '중앙일보', name: '중앙일보', icon: '📰' }
   ]
 
   // Get selected category display name
@@ -159,59 +152,9 @@ const StdNews: React.FC = () => {
     }
   }
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric'
-    })
-  }
-
   const formatNewsDate = (dateString: string) => {
     const date = new Date(dateString)
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
-  }
-
-  const handleDatePress = () => {
-    Alert.prompt(
-      'Chọn ngày',
-      'Nhập ngày theo định dạng dd/mm/yyyy:',
-      [
-        {
-          text: 'Hủy',
-          style: 'cancel'
-        },
-        {
-          text: 'OK',
-          onPress: (dateString?: string) => {
-            if (dateString) {
-              // Parse input format dd/mm/yyyy
-              const parts = dateString.trim().split('/')
-              if (parts.length === 3) {
-                const day = parseInt(parts[0])
-                const month = parseInt(parts[1])
-                const year = parseInt(parts[2])
-                
-                const newDate = new Date(year, month - 1, day)
-                if (!isNaN(newDate.getTime()) && 
-                    newDate.getDate() === day && 
-                    newDate.getMonth() === month - 1 && 
-                    newDate.getFullYear() === year) {
-                  setSelectedDate(newDate)
-                  setDisplayDate(formatDate(newDate))
-                } else {
-                  Alert.alert('Lỗi', 'Ngày không hợp lệ. Vui lòng nhập đúng định dạng dd/mm/yyyy')
-                }
-              } else {
-                Alert.alert('Lỗi', 'Vui lòng nhập đúng định dạng dd/mm/yyyy')
-              }
-            }
-          }
-        }
-      ],
-      'plain-text',
-      formatDate(selectedDate)
-    )
   }
 
   const FilterButton = ({ item, isInGroup = false }: { item: any; isInGroup?: boolean }) => {
@@ -381,6 +324,8 @@ const StdNews: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+
+
       {/* Filters */}
       <View style={styles.filtersContainer}>
         <View style={styles.filtersRow}>
@@ -395,13 +340,6 @@ const StdNews: React.FC = () => {
             <FilterButton item={filters[3]} />
           </View>
         </View>
-      </View>
-
-      {/* Date Selector */}
-      <View style={styles.dateSelector}>
-        <TouchableOpacity style={styles.dateSelectorButton} onPress={handleDatePress}>
-          <Text style={styles.dateSelectorText}>{displayDate}</Text>
-        </TouchableOpacity>
       </View>
 
       {/* News List */}
@@ -622,30 +560,6 @@ const styles = StyleSheet.create({
   selectedCategoryDropdownText: {
     color: '#269a56ff',
     fontWeight: '600',
-  },
-
-  // Date Selector
-  dateSelector: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: -20,
-  },
-  dateSelectorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // backgroundColor: palette.white,
-    backgroundColor: '#CCFFCC',
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    alignSelf: 'flex-start'
-  },
-  dateSelectorText: {
-    fontSize: 14,
-    color: colors.light.text,
-    marginRight: spacing.sm
   },
 
   // News List - Updated to match NewsList design

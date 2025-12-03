@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -31,6 +32,7 @@ interface CultureItem {
   title: string;
   subtitle?: string;
   description: string;
+  coverImage?: string;
   category: {
     id: string;
     title: string;
@@ -145,6 +147,15 @@ const StdCulture: React.FC = () => {
       style={styles.itemCard}
       onPress={() => handleItemPress(item)}
     >
+      {/* Cover Image */}
+      {item.coverImage && (
+        <Image 
+          source={{ uri: item.coverImage }}
+          style={styles.itemImage}
+          resizeMode="cover"
+        />
+      )}
+      
       <View style={styles.itemContent}>
         <View style={styles.itemHeader}>
           <View style={styles.itemIconContainer}>
@@ -376,18 +387,22 @@ const styles = StyleSheet.create({
   itemCard: {
     backgroundColor: palette.white,
     borderRadius: 16,
-    padding: spacing.lg,
     marginBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
-    elevation: 3
+    elevation: 3,
+    overflow: 'hidden' // Để image bo góc theo card
+  },
+  itemImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#f5f5f5'
   },
   itemContent: {
-    flex: 1
+    flex: 1,
+    padding: spacing.lg
   },
   itemHeader: {
     flexDirection: 'row',

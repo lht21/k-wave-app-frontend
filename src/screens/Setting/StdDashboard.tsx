@@ -1,6 +1,7 @@
-import React from 'react'
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native'
+import * as React from 'react'
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { AuthContext } from '../../contexts/AuthContext'
 import { spacing } from '../../theme/spacing'
 import { colors } from '../../theme/colors'
 import { typography } from '../../theme/typography'
@@ -36,75 +37,151 @@ const HorizontalBar: React.FC<{ percent: number }> = ({ percent = 0 }) => {
 
 const DashboardStd: React.FC = () => {
   const navigation = useNavigation()
+  const authContext = React.useContext(AuthContext)
   const [activeTab, setActiveTab] = React.useState('progress')
+
+  if (!authContext) {
+    throw new Error('DashboardStd must be used within an AuthProvider')
+  }
+
+  const { user, getUserProfile, logout } = authContext
+
+  // Load user profile if not available
+  React.useEffect(() => {
+    if (!user) {
+      getUserProfile()
+    }
+  }, [])
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc chắn muốn đăng xuất?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel'
+        },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout()
+              // Navigate to login screen
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' as never }]
+              })
+            } catch (error) {
+              console.error('❌ Logout error:', error)
+              Alert.alert('Lỗi', 'Không thể đăng xuất. Vui lòng thử lại.')
+            }
+          }
+        }
+      ]
+    )
+  }
 
   const handleTabPress = (tabName: string) => {
     setActiveTab(tabName)
   }
 
-  const renderProgressContent = () => (
-    <>
-      {/* Weekly practice progress card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Tiến độ luyện tập hàng tuần</Text>
+  const renderProgressContent = () => {
+    // Calculate real progress data
+    const completedLessons = user?.progress?.completedLessons?.length || 0;
+    const totalStudyTime = user?.progress?.totalStudyTime || 0;
+    const streakDays = user?.progress?.streakDays || 0;
+    
+    return (
+      <>
+        {/* Weekly practice progress card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Tiến độ luyện tập hàng tuần</Text>
 
-        <View style={styles.weeklyRow}>
-          <View style={{ width: 132, justifyContent: 'center' }}>
-            <Text style={styles.smallText}>Hôm nay, 01/01</Text>
-            <Text style={styles.bigText}>0 exp</Text>
-            <Text style={styles.smallText}>Tỷ lệ đúng</Text>
-            <Text style={[styles.bigText, { fontSize: 12 }]}>0%</Text>
-          </View>
-
-          <View style={styles.weekPills}>
-            {weeklyProgress.map((w, idx) => (
-              <View key={w.day} style={styles.weekItem}>
-                <ProgressPill percent={w.percent} active={idx === 0} />
-                <Text style={styles.weekLabel}>{w.day}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-
-      {/* Lesson stats card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Thống kê bài học</Text>
-        <View style={{ marginTop: spacing.sm }}>
-          {lessonStats.map((ls) => (
-            <View key={ls.title} style={styles.lessonRow}>
-              <Text style={styles.lessonTitle}>{ls.title}</Text>
-              <HorizontalBar percent={ls.percent} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Exam stats */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Thống kê điểm thi</Text>
-        <View style={{ marginTop: spacing.sm }}>
           <View style={styles.weeklyRow}>
             <View style={{ width: 132, justifyContent: 'center' }}>
-              <Text style={styles.smallText}>Hôm nay, 01/01</Text>
-              <Text style={styles.bigText}>0 exp</Text>
-              <Text style={styles.smallText}>Tỷ lệ đúng</Text>
-              <Text style={[styles.bigText, { fontSize: 12 }]}>0%</Text>
+              <Text style={styles.smallText}>Hôm nay, {new Date().toLocaleDateString('vi-VN')}</Text>
+              <Text style={styles.bigText}>{user?.usageStats?.lessonsToday || 0} bài học</Text>
+              <Text style={styles.smallText}>Tổng thời gian</Text>
+              <Text style={[styles.bigText, { fontSize: 12 }]}>{user?.progress?.totalStudyTime || 0} phút</Text>
             </View>
 
             <View style={styles.weekPills}>
               {weeklyProgress.map((w, idx) => (
-                <View key={`exam-${w.day}`} style={styles.weekItem}>
-                  <ProgressPill percent={w.percent > 10 ? w.percent - 10 : w.percent} active={idx === 0} />
+                <View key={w.day} style={styles.weekItem}>
+                  <ProgressPill percent={w.percent} active={idx === 0} />
                   <Text style={styles.weekLabel}>{w.day}</Text>
                 </View>
               ))}
             </View>
           </View>
         </View>
-      </View>
-    </>
-  )
+
+        {/* User Stats Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thông tin tài khoản</Text>
+          <View style={styles.userStatsContainer}>
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatLabel}>Gói đăng ký</Text>
+              <Text style={styles.userStatValue}>
+                {user?.subscription?.type === 'premium' ? '🌟 Premium' : '🆓 Miễn phí'}
+              </Text>
+            </View>
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatLabel}>Bài học hoàn thành</Text>
+              <Text style={styles.userStatValue}>{completedLessons} bài</Text>
+            </View>
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatLabel}>Chuỗi ngày học</Text>
+              <Text style={styles.userStatValue}>{streakDays} ngày</Text>
+            </View>
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatLabel}>TOPIK</Text>
+              <Text style={styles.userStatValue}>{user?.topikAchievement || 'Chưa có'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Lesson stats card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thống kê bài học</Text>
+          <View style={{ marginTop: spacing.sm }}>
+            {lessonStats.map((ls) => (
+              <View key={ls.title} style={styles.lessonRow}>
+                <Text style={styles.lessonTitle}>{ls.title}</Text>
+                <HorizontalBar percent={ls.percent} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Exam stats */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thống kê điểm thi</Text>
+          <View style={{ marginTop: spacing.sm }}>
+            <View style={styles.weeklyRow}>
+              <View style={{ width: 132, justifyContent: 'center' }}>
+                <Text style={styles.smallText}>Tháng này</Text>
+                <Text style={styles.bigText}>{user?.usageStats?.examsThisMonth || 0} bài thi</Text>
+                <Text style={styles.smallText}>Giới hạn</Text>
+                <Text style={[styles.bigText, { fontSize: 12 }]}>{user?.limits?.monthlyExams || 0} bài/tháng</Text>
+              </View>
+
+              <View style={styles.weekPills}>
+                {weeklyProgress.map((w, idx) => (
+                  <View key={`exam-${w.day}`} style={styles.weekItem}>
+                    <ProgressPill percent={w.percent > 10 ? w.percent - 10 : w.percent} active={idx === 0} />
+                    <Text style={styles.weekLabel}>{w.day}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </>
+    )
+  }
 
   const renderAchievementsContent = () => (
     <>
@@ -186,10 +263,16 @@ const DashboardStd: React.FC = () => {
           <View style={[styles.rankingItem, styles.currentUser]}>
             <Text style={[styles.rank, styles.currentUserText]}>5</Text>
             <View style={[styles.rankingAvatar, styles.currentUserAvatar]}>
-              <Text style={styles.rankingAvatarText}>A</Text>
+              <Text style={styles.rankingAvatarText}>
+                {user?.fullName?.charAt(0).toUpperCase() || 'U'}
+              </Text>
             </View>
-            <Text style={[styles.rankingName, styles.currentUserText]}>Nguyễn Thị A (Bạn)</Text>
-            <Text style={[styles.rankingScore, styles.currentUserText]}>470 exp</Text>
+            <Text style={[styles.rankingName, styles.currentUserText]}>
+              {user?.fullName || 'Người dùng'} (Bạn)
+            </Text>
+            <Text style={[styles.rankingScore, styles.currentUserText]}>
+              {user?.progress?.totalStudyTime || 0} phút
+            </Text>
           </View>
         </View>
       </View>
@@ -201,7 +284,10 @@ const DashboardStd: React.FC = () => {
       {/* Account Settings */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tài khoản</Text>
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={() => (navigation as any).navigate('UserProfile')}
+        >
           <Text style={styles.settingText}>Thông tin cá nhân</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
@@ -243,8 +329,11 @@ const DashboardStd: React.FC = () => {
           <Text style={styles.settingText}>Điều khoản sử dụng</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
-          <Text style={styles.settingText}>Đăng xuất</Text>
+        <TouchableOpacity 
+          style={styles.settingItem}
+          onPress={handleLogout}
+        >
+          <Text style={[styles.settingText, styles.logoutText]}>Đăng xuất</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
       </View>
@@ -284,10 +373,20 @@ const DashboardStd: React.FC = () => {
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Image source={{ uri: 'https://dimensions.edu.vn/upload/2025/01/avt-doi-meme-006.webp' }} style={styles.avatar} />
+        <Image 
+          source={{ 
+            uri: user?.avatar || 'https://dimensions.edu.vn/upload/2025/01/avt-doi-meme-006.webp' 
+          }} 
+          style={styles.avatar} 
+        />
         <View style={{ marginLeft: spacing.md }}>
-          <Text style={styles.name}>Nguyễn Thị A</Text>
-          <Text style={styles.sub}>470 exp</Text>
+          <Text style={styles.name}>{user?.fullName || 'Đang tải...'}</Text>
+          <Text style={styles.sub}>
+            {user?.progress?.totalStudyTime || 0} phút học • {user?.level || 'Chưa xác định'}
+          </Text>
+          <Text style={styles.sub}>
+            Chuỗi ngày: {user?.progress?.streakDays || 0} ngày
+          </Text>
         </View>
       </View>
 
@@ -501,6 +600,34 @@ const styles = StyleSheet.create({
   },
   currentUserText: {
     color: colors.light.primary,
+    fontWeight: '600'
+  },
+
+  // User stats styles
+  userStatsContainer: {
+    marginTop: spacing.sm,
+    gap: spacing.sm
+  },
+  userStatItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs
+  },
+  userStatLabel: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+    flex: 1
+  },
+  userStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.light.text
+  },
+
+  // Logout styles
+  logoutText: {
+    color: '#dc3545',
     fontWeight: '600'
   }
 })

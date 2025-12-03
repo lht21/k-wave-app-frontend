@@ -10,7 +10,9 @@ type ItemProps = {
 const Item = ({title}: ItemProps) => {
   return (
     <TouchableOpacity style={[styles.itemContainer]}>
-      <Image source={require('../../assets/icon1.png')} style={{width: 50, height: 50}} />
+      <View style={styles.iconPlaceholder}>
+        <Text style={styles.iconText}>📚</Text>
+      </View>
 
       
       <Text style={[styles.itemLabel]}>{title}</Text>
@@ -42,6 +44,18 @@ const styles = StyleSheet.create({
         fontSize: typography.fontSizes.sm,
         fontWeight: '800',
         color: palette.black,
+    },
+    iconPlaceholder: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#269a56',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconText: {
+        fontSize: 24,
+        textAlign: 'center',
     },
 
 })

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { newsApiService, NewsArticle, formatNewsDate, getDifficultyColor, getDifficultyText } from '../services/newsApiService';
 import { useNews } from '../hooks/useNews';

@@ -1,5 +1,16 @@
-import API_BASE_URL, { getAuthHeaders } from '../api/api';
+import API_BASE_URL, { getAuthHeaders, getWorkingEndpoint } from '../api/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Dynamic AUTH_URL based on working endpoint
+const getAuthURL = async (): Promise<string> => {
+  try {
+    const workingEndpoint = await getWorkingEndpoint();
+    return workingEndpoint + "/auth";
+  } catch (error) {
+    console.log('Using fallback AUTH_URL');
+    return API_BASE_URL + "/auth";
+  }
+};
 
 const AUTH_URL = API_BASE_URL + "/auth";
 
@@ -58,15 +69,25 @@ export const authService = {
   // Đăng nhập
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
+      console.log('🔐 Attempting login with endpoint:', AUTH_URL);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${AUTH_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify(credentials),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       const result = await response.json();
+      
+      console.log('📥 Login response status:', response.status);
+      console.log('📥 Login response:', { success: response.ok, hasToken: !!result.token });
 
       if (!response.ok) {
         throw new Error(result.msg || 'Đăng nhập thất bại');
@@ -81,6 +102,16 @@ export const authService = {
         throw new Error('Không tìm thấy token trong phản hồi đăng nhập.');
       }
     } catch (error) {
+      console.error('❌ Login error:', error);
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra:\n1. Server có đang chạy?\n2. Kết nối mạng\n3. Địa chỉ IP server');
+      }
+      
+      if (error.name === 'AbortError') {
+        throw new Error('Kết nối quá chậm. Vui lòng thử lại.');
+      }
+      
       throw error;
     }
   },
@@ -157,25 +188,60 @@ resetPassword: async (resetData: { otp: string; newPassword: string }): Promise<
   }
 },
 
-// Gửi lại OTP
-resendOtp: async (email: string): Promise<any> => {
-  try {
-    const response = await fetch(`${AUTH_URL}/resend-password-otp`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ email })
-    });
+  // Gửi lại OTP
+  resendOtp: async (email: string): Promise<any> => {
+    try {
+      const response = await fetch(`${AUTH_URL}/resend-password-otp`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email })
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
-      throw new Error(result.msg || 'Gửi lại mã thất bại');
+      if (!response.ok) {
+        throw new Error(result.msg || 'Gửi lại mã thất bại');
+      }
+
+      return result;
+    } catch (error) {
+      throw error;
     }
+  },
 
-    return result;
-  } catch (error) {
-    throw error;
+  // Lấy thông tin profile user
+  getUserProfile: async (token: string): Promise<AuthResponse> => {
+    try {
+      console.log('🔍 Fetching user profile...');
+      console.log('🔗 API URL:', `${API_BASE_URL}/user/profile`);
+      console.log('🎫 Token:', token ? 'Present' : 'Missing');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${API_BASE_URL}/user/profile`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      const result = await response.json();
+      console.log('📥 Profile response status:', response.status);
+      console.log('📥 Profile response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.msg || 'Không thể lấy thông tin người dùng');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ getUserProfile error:', error);
+      throw error;
+    }
   }
-}
 
 };

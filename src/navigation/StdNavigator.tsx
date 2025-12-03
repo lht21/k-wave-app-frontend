@@ -29,10 +29,13 @@ import StdLesson from '../screens/StdLearn/StdLesson';
 import StdSkillPractice from '../screens/StdLearn/StdSkillPractice';
 import StdCulture from '../screens/StdLearn/StdCulture';
 import StdCultureDetail from '../screens/StdLearn/StdCultureDetail';
+import CultureTestDemo from '../screens/CultureTestDemo';
 import NewsDetail from '../screens/StdNewsDetail';
 import StdVideoLearning from '../screens/StdLearn/StdVideoLearning';
 import VideoCategory from '../screens/StdLearn/VideoCategory';
 import VideoDetail from '../screens/StdLearn/VideoDetail';
+import UserProfile from '../screens/Setting/UserProfile';
+import EditProfile from '../screens/Setting/EditProfile';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const SettingStack = createStackNavigator();
@@ -43,6 +46,8 @@ const SettingStackNavigator = () => {
     <SettingStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingStack.Screen name="Dashboard" component={StdDashboard} />
       <SettingStack.Screen name="Settings" component={SettingScreen} />
+      <SettingStack.Screen name="UserProfile" component={UserProfile} />
+      <SettingStack.Screen name="EditProfile" component={EditProfile} />
     </SettingStack.Navigator>
   );
 };
@@ -168,6 +173,12 @@ const StdAppNavigator = () => {
       <Stack.Screen 
         name="StdCultureDetail" 
         component={StdCultureDetail}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen 
+        name="CultureTestDemo" 
+        component={CultureTestDemo}
         options={{ headerShown: false }}
       />
 
