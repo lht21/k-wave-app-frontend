@@ -25,33 +25,19 @@ import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
-// Types
-export interface Question {
-  _id: string;
-  question: string;
-  options: string[];
-  answer: number; // 0-3
-  explanation: string;
-}
-
-export interface ReadingLesson {
-  _id: string;
-  title: string;
-  content: string;
-  translation: string;
-  level: string;
-  questions: Question[];
-}
+// Sử dụng types từ service
+import { Reading, Question } from '../../services/readingService';
 
 interface ModalReadingProps {
   isVisible: boolean;
   onClose: () => void;
-  reading?: ReadingLesson | null;
-  onSave: (readingData: ReadingLesson) => void;
+  reading?: Reading | null;
+  onSave: (readingData: Reading) => void;
   isAdding?: boolean;
+  lessonId?: string; 
 }
 
-type ReadingFormData = Omit<ReadingLesson, '_id'>;
+type ReadingFormData = Omit<Reading, '_id'>;
 
 const ModalReading: React.FC<ModalReadingProps> = ({
   isVisible,
@@ -59,6 +45,7 @@ const ModalReading: React.FC<ModalReadingProps> = ({
   reading,
   onSave,
   isAdding = false,
+  lessonId,
 }) => {
   const [formData, setFormData] = useState<ReadingFormData>({
     title: '',
@@ -66,6 +53,9 @@ const ModalReading: React.FC<ModalReadingProps> = ({
     translation: '',
     level: 'Sơ cấp 1',
     questions: [],
+    difficulty: 'Trung bình',
+    tags: [],
+    lesson: lessonId,
   });
 
   const [expandedQuestionIndex, setExpandedQuestionIndex] = useState<number | null>(null);
@@ -78,14 +68,18 @@ const ModalReading: React.FC<ModalReadingProps> = ({
         content: reading.content,
         translation: reading.translation,
         level: reading.level,
-        questions: JSON.parse(JSON.stringify(reading.questions)),
+        difficulty: reading.difficulty || 'Trung bình',
+        tags: reading.tags || [],
+        questions: reading.questions ? JSON.parse(JSON.stringify(reading.questions)) : [],
+        // Xử lý lesson: nếu là object, lấy _id; nếu là string, giữ nguyên
+        lesson: typeof reading.lesson === 'object' ? reading.lesson._id : reading.lesson,
       });
     } else {
       resetForm();
     }
     setErrors({});
     setExpandedQuestionIndex(null);
-  }, [reading, isVisible]);
+  }, [reading, isVisible, lessonId]);
 
   const resetForm = () => {
     setFormData({
@@ -93,7 +87,10 @@ const ModalReading: React.FC<ModalReadingProps> = ({
       content: '',
       translation: '',
       level: 'Sơ cấp 1',
+      difficulty: 'Trung bình',
+      tags: [],
       questions: [],
+      lesson: lessonId,
     });
   };
 
@@ -105,20 +102,19 @@ const ModalReading: React.FC<ModalReadingProps> = ({
   };
 
   // --- Logic Question ---
-  const addQuestion = () => {
-    const newQuestion: Question = {
-      _id: Date.now().toString(),
-      question: '',
-      options: ['', '', '', ''],
-      answer: 0,
-      explanation: ''
-    };
-    setFormData(prev => ({
-      ...prev,
-      questions: [...prev.questions, newQuestion]
-    }));
-    setExpandedQuestionIndex(formData.questions.length);
+const addQuestion = () => {
+  const newQuestion = {
+    question: '',
+    options: ['', '', '', ''],
+    answer: 0,
+    explanation: ''
   };
+  setFormData(prev => ({
+    ...prev,
+    questions: [...prev.questions, newQuestion]
+  }));
+  setExpandedQuestionIndex(formData.questions.length);
+};
 
   const removeQuestion = (index: number) => {
     const newQuestions = formData.questions.filter((_, i) => i !== index);
@@ -163,10 +159,13 @@ const ModalReading: React.FC<ModalReadingProps> = ({
   const handleSave = () => {
     if (!validateForm()) return;
 
-    onSave({
-      _id: reading?._id || Date.now().toString(),
+    const readingData: Reading = {
+      _id: reading?._id || '',
       ...formData,
-    });
+      lesson: lessonId || formData.lesson,
+    };
+
+    onSave(readingData);
   };
 
   return (
@@ -182,6 +181,7 @@ const ModalReading: React.FC<ModalReadingProps> = ({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {isAdding ? 'Thêm bài đọc mới' : 'Sửa bài đọc'}
+              {lessonId && <Text style={styles.lessonIndicator}> (Bài học)</Text>}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <HugeiconsIcon icon={Cancel01Icon} size={24} color={colors.light.text} />
@@ -211,6 +211,16 @@ const ModalReading: React.FC<ModalReadingProps> = ({
                   value={formData.level}
                   onChangeText={(text) => handleFieldChange('level', text)}
                   placeholder="VD: Sơ cấp 1"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Độ khó</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.difficulty}
+                  onChangeText={(text) => handleFieldChange('difficulty', text)}
+                  placeholder="VD: Trung bình"
                 />
               </View>
             </View>
@@ -262,7 +272,7 @@ const ModalReading: React.FC<ModalReadingProps> = ({
               </View>
 
               {formData.questions.map((q, index) => (
-                <View key={q._id || index} style={styles.questionCard}>
+                <View key={index} style={styles.questionCard}>
                   <TouchableOpacity 
                     style={styles.questionHeader} 
                     onPress={() => toggleExpandQuestion(index)}
@@ -345,46 +355,201 @@ const ModalReading: React.FC<ModalReadingProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  modalContainer: { backgroundColor: colors.light.background, borderRadius: 12, width: '100%', height: '90%', shadowColor: '#000', shadowOffset: {width:0,height:2}, shadowOpacity:0.25, elevation: 5 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: colors.light.border },
-  modalTitle: { fontSize: typography.fontSizes.lg, fontFamily: typography.fonts.bold, color: colors.light.text },
-  closeButton: { padding: 4 },
-  modalContent: { padding: 16 },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 16 
+  },
+  modalContainer: { 
+    backgroundColor: colors.light.background, 
+    borderRadius: 12, 
+    width: '100%', 
+    height: '90%', 
+    shadowColor: '#000', 
+    shadowOffset: {width:0,height:2}, 
+    shadowOpacity:0.25, 
+    elevation: 5 
+  },
+  modalHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 16, 
+    borderBottomWidth: 1, 
+    borderColor: colors.light.border 
+  },
+  modalTitle: { 
+    fontSize: typography.fontSizes.lg, 
+    fontFamily: typography.fonts.bold, 
+    color: colors.light.text 
+  },
+  lessonIndicator: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.primary,
+  },
+  closeButton: { 
+    padding: 4 
+  },
+  modalContent: { 
+    padding: 16 
+  },
   
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: typography.fontSizes.md, fontFamily: typography.fonts.bold, color: colors.light.primary, marginBottom: 12 },
+  section: { 
+    marginBottom: 24 
+  },
+  sectionTitle: { 
+    fontSize: typography.fontSizes.md, 
+    fontFamily: typography.fonts.bold, 
+    color: colors.light.primary, 
+    marginBottom: 12 
+  },
   
-  inputGroup: { marginBottom: 16 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  label: { fontSize: typography.fontSizes.sm, fontFamily: typography.fonts.semiBold, color: colors.light.text },
-  required: { color: palette.error },
+  inputGroup: { 
+    marginBottom: 16 
+  },
+  labelRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 8 
+  },
+  label: { 
+    fontSize: typography.fontSizes.sm, 
+    fontFamily: typography.fonts.semiBold, 
+    color: colors.light.text 
+  },
+  required: { 
+    color: palette.error 
+  },
   
-  input: { borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, padding: 12, backgroundColor: colors.light.card, fontSize: typography.fontSizes.sm },
-  inputError: { borderColor: palette.error },
-  errorText: { color: palette.error, fontSize: typography.fontSizes.xs, marginTop: 4 },
+  input: { 
+    borderWidth: 1, 
+    borderColor: colors.light.border, 
+    borderRadius: 8, 
+    padding: 12, 
+    backgroundColor: colors.light.card, 
+    fontSize: typography.fontSizes.sm 
+  },
+  inputError: { 
+    borderColor: palette.error 
+  },
+  errorText: { 
+    color: palette.error, 
+    fontSize: typography.fontSizes.xs, 
+    marginTop: 4 
+  },
   
-  textArea: { borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, padding: 12, backgroundColor: colors.light.card, fontSize: typography.fontSizes.md, minHeight: 100, textAlignVertical: 'top' },
-  textAreaSmall: { borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, padding: 12, backgroundColor: colors.light.card, fontSize: typography.fontSizes.md, minHeight: 60, textAlignVertical: 'top' },
+  textArea: { 
+    borderWidth: 1, 
+    borderColor: colors.light.border, 
+    borderRadius: 8, 
+    padding: 12, 
+    backgroundColor: colors.light.card, 
+    fontSize: typography.fontSizes.md, 
+    minHeight: 100, 
+    textAlignVertical: 'top' 
+  },
+  textAreaSmall: { 
+    borderWidth: 1, 
+    borderColor: colors.light.border, 
+    borderRadius: 8, 
+    padding: 12, 
+    backgroundColor: colors.light.card, 
+    fontSize: typography.fontSizes.md, 
+    minHeight: 60, 
+    textAlignVertical: 'top' 
+  },
 
   // Question Styles
-  questionsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  addButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
-  addButtonText: { color: colors.light.primary, fontSize: typography.fontSizes.sm },
+  questionsHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 12 
+  },
+  addButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    padding: 4 
+  },
+  addButtonText: { 
+    color: colors.light.primary, 
+    fontSize: typography.fontSizes.sm 
+  },
   
-  questionCard: { backgroundColor: colors.light.card, borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, marginBottom: 12, overflow: 'hidden' },
-  questionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: colors.light.background },
-  questionTitle: { fontSize: typography.fontSizes.sm, fontFamily: typography.fonts.semiBold, color: colors.light.text, flex: 1, marginRight: 8 },
-  questionBody: { padding: 12, borderTopWidth: 1, borderColor: colors.light.border },
+  questionCard: { 
+    backgroundColor: colors.light.card, 
+    borderWidth: 1, 
+    borderColor: colors.light.border, 
+    borderRadius: 8, 
+    marginBottom: 12, 
+    overflow: 'hidden' 
+  },
+  questionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 12, 
+    backgroundColor: colors.light.background 
+  },
+  questionTitle: { 
+    fontSize: typography.fontSizes.sm, 
+    fontFamily: typography.fonts.semiBold, 
+    color: colors.light.text, 
+    flex: 1, 
+    marginRight: 8 
+  },
+  questionBody: { 
+    padding: 12, 
+    borderTopWidth: 1, 
+    borderColor: colors.light.border 
+  },
   
-  optionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
-  radioBox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.light.border, justifyContent: 'center', alignItems: 'center' },
-  radioSelected: { backgroundColor: palette.success, borderColor: palette.success },
+  optionRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 8, 
+    gap: 8 
+  },
+  radioBox: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12, 
+    borderWidth: 2, 
+    borderColor: colors.light.border, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  radioSelected: { 
+    backgroundColor: palette.success, 
+    borderColor: palette.success 
+  },
   
-  deleteQuestionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, padding: 8, backgroundColor: palette.error + '10', borderRadius: 6 },
-  deleteQuestionText: { color: palette.error, fontSize: typography.fontSizes.sm },
+  deleteQuestionButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 6, 
+    marginTop: 12, 
+    padding: 8, 
+    backgroundColor: palette.error + '10', 
+    borderRadius: 6 
+  },
+  deleteQuestionText: { 
+    color: palette.error, 
+    fontSize: typography.fontSizes.sm 
+  },
 
-  modalFooter: { flexDirection: 'row', padding: 16, borderTopWidth: 1, borderColor: colors.light.border, gap: 12 },
+  modalFooter: { 
+    flexDirection: 'row', 
+    padding: 16, 
+    borderTopWidth: 1, 
+    borderColor: colors.light.border, 
+    gap: 12 
+  },
 });
 
 export default ModalReading;

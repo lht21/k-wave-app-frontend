@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   StyleSheet,
-  TextInput,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -22,117 +24,229 @@ import {
 } from '@hugeicons/core-free-icons';
 
 import Button from '../../components/Button/Button';
-import ModalReading, { ReadingLesson } from '../Modal/ModalReading';
+import ModalReading from '../Modal/ModalReading';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { readingService, Reading, Question } from '../../services/readingService';
 
-// Mock Data
-const initialReadingData: ReadingLesson[] = [
-  {
-    _id: '1',
-    title: 'Bài đọc sơ cấp 1 - Giới thiệu bản thân',
-    content: '안녕하세요. 저는 한국 대학교에서 경제학을 공부하는 학생입니다. 제 취미는 독서와 음악 감상입니다. 주말에는 친구들과 함께 영화를 보거나 카페에 가서 시간을 보냅니다.',
-    translation: 'Xin chào. Tôi là sinh viên học ngành kinh tế tại trường đại học Hàn Quốc. Sở thích của tôi là đọc sách và nghe nhạc. Vào cuối tuần, tôi thường xem phim hoặc đi cà phê với bạn bè.',
-    level: 'Sơ cấp 1',
-    questions: [
-      {
-        _id: 'q1',
-        question: 'Người viết học ngành gì?',
-        options: ['Kinh tế', 'Y học', 'Luật', 'Kỹ thuật'],
-        answer: 0,
-        explanation: 'Trong câu "경제학을 공부하는 학생입니다" có nghĩa là "sinh viên học ngành kinh tế"'
-      },
-      {
-        _id: 'q2', 
-        question: 'Sở thích của người viết là gì?',
-        options: ['Đọc sách và nghe nhạc', 'Thể thao', 'Nấu ăn', 'Du lịch'],
-        answer: 0,
-        explanation: 'Câu "제 취미는 독서와 음악 감상입니다" có nghĩa là "Sở thích của tôi là đọc sách và nghe nhạc"'
-      },
-    ]
-  },
-  {
-    _id: '2',
-    title: 'Bài đọc sơ cấp 2 - Thói quen hàng ngày',
-    content: '저는 아침 7시에 일어납니다. 8시에 아침을 먹고 9시부터 학교에 갑니다. 오후 5시에 집에 와서 공부를 합니다.',
-    translation: 'Tôi thức dậy lúc 7 giờ sáng. Tôi ăn sáng lúc 8 giờ và đi học từ 9 giờ. Tôi về nhà lúc 5 giờ chiều và học bài.',
-    level: 'Sơ cấp 1',
-    questions: [
-      {
-        _id: 'q4',
-        question: 'Người viết đi học lúc mấy giờ?',
-        options: ['9 giờ', '7 giờ', '8 giờ', '5 giờ'],
-        answer: 0,
-        explanation: 'Câu "9시부터 학교에 갑니다" có nghĩa là "đi học từ 9 giờ"'
-      }
-    ]
-  }
-];
+interface ReadingTabProps {
+  lessonId: string;
+}
 
-const ReadingTab: React.FC = () => {
-  const [data, setData] = useState<ReadingLesson[]>(initialReadingData);
+const ReadingTab: React.FC<ReadingTabProps> = ({ lessonId }) => {
+  // State management
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<ReadingLesson | null>(null);
+  const [editingReading, setEditingReading] = useState<Reading | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Logic Filter
-  const filteredData = data.filter(lesson =>
-    lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lesson.level.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lesson.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Load readings từ API
+  const loadReadings = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
-  // Logic CRUD
-  const handleEditLesson = (lesson: ReadingLesson) => {
-    setEditingLesson(lesson);
-    setIsAdding(false);
-    setIsModalOpen(true);
+      const currentPage = isRefresh ? 1 : page;
+      
+      let response;
+      if (lessonId) {
+        // Lấy readings theo lesson
+        response = await readingService.getReadingsByLesson(lessonId, {
+          search: searchTerm,
+          page: currentPage,
+          limit: 10,
+        });
+      } else {
+        // Lấy tất cả readings
+        response = await readingService.getReadings({
+          search: searchTerm,
+          page: currentPage,
+          limit: 10,
+        });
+      }
+
+      if (isRefresh) {
+        setReadings(response.readings);
+        setPage(1);
+      } else {
+        setReadings(prev => [...prev, ...response.readings]);
+      }
+
+      setTotalPages(response.totalPages);
+      setHasMore(currentPage < response.totalPages);
+      
+    } catch (error) {
+      console.error('Error loading readings:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách bài đọc');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [lessonId, searchTerm, page]);
+
+  // Load more data
+  const handleLoadMore = () => {
+    if (hasMore && !loading) {
+      setPage(prev => prev + 1);
+    }
   };
 
-  const handleAddLesson = () => {
-    setEditingLesson(null);
+  // Refresh data
+  const handleRefresh = () => {
+    loadReadings(true);
+  };
+
+  // Search với debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadReadings(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, loadReadings]);
+
+  // Load data khi component mount
+  useEffect(() => {
+    loadReadings();
+  }, [page]);
+
+  // CRUD Operations
+  const handleAddReading = () => {
+    setEditingReading(null);
     setIsAdding(true);
     setIsModalOpen(true);
   };
 
-  const handleDeleteLesson = (lessonId: string) => {
-    Alert.alert('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa bài đọc này?', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Xóa', style: 'destructive', onPress: () => setData(prev => prev.filter(item => item._id !== lessonId)) },
-    ]);
+  const handleEditReading = (reading: Reading) => {
+    setEditingReading(reading);
+    setIsAdding(false);
+    setIsModalOpen(true);
   };
 
-  const handleSaveLesson = (lessonData: ReadingLesson) => {
+  const handleDeleteReading = async (readingId: string) => {
+    Alert.alert(
+      'Xác nhận xóa',
+      'Bạn có chắc chắn muốn xóa bài đọc này?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await readingService.deleteReading(readingId);
+              Alert.alert('Thành công', 'Đã xóa bài đọc');
+              loadReadings(true); // Refresh data
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể xóa bài đọc');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+// Trong ReadingTab component
+// ReadingTab.tsx - Sửa handleSaveReading
+const handleSaveReading = async (readingData: Reading) => {
+  try {
+    // Chuẩn bị data - bỏ tất cả _id trong questions
+    const readingForAPI = {
+      ...readingData,
+      questions: readingData.questions.map(q => ({
+        question: q.question,
+        options: q.options,
+        answer: q.answer,
+        explanation: q.explanation || ''
+      }))
+    };
+
     if (isAdding) {
-      setData(prev => [...prev, lessonData]);
+      if (lessonId) {
+        // Tạo mới với lessonId
+        await readingService.createReadingForLesson(lessonId, readingForAPI);
+        Alert.alert('Thành công', 'Đã tạo bài đọc mới');
+      } else {
+        // Tạo mới không có lesson
+        const { lesson, ...dataWithoutLesson } = readingForAPI;
+        await readingService.createReading(dataWithoutLesson);
+        Alert.alert('Thành công', 'Đã tạo bài đọc mới');
+      }
     } else {
-      setData(prev => prev.map(item => item._id === lessonData._id ? lessonData : item));
+      // Cập nhật bài đọc
+      if (readingData._id) {
+        await readingService.updateReading(readingData._id, readingForAPI);
+        Alert.alert('Thành công', 'Đã cập nhật bài đọc');
+      } else {
+        throw new Error('Không tìm thấy ID bài đọc');
+      }
     }
+    
     setIsModalOpen(false);
-  };
+    loadReadings(true);
+    
+  } catch (error: any) {
+    console.error('Error saving reading:', error);
+    Alert.alert('Lỗi', error.message || 'Không thể lưu bài đọc');
+  }
+};
 
-  // Render Card
-  const renderReadingCard = (lesson: ReadingLesson) => (
-    <View key={lesson._id} style={styles.card}>
+// Render Reading Card
+  const renderReadingCard = (reading: Reading) => (
+    <View key={reading._id} style={styles.card}>
       {/* Card Header */}
       <View style={styles.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{lesson.title}</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>{lesson.level}</Text>
+        <View style={styles.cardHeaderLeft}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {reading.title}
+          </Text>
+          <View style={styles.levelRow}>
+            {reading.level && (
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelText}>{reading.level}</Text>
+              </View>
+            )}
+            {reading.difficulty && (
+              <View style={styles.difficultyBadge}>
+                <Text style={styles.difficultyText}>{reading.difficulty}</Text>
+              </View>
+            )}
           </View>
         </View>
-        
+
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={() => handleEditLesson(lesson)}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => handleEditReading(reading)}
+          >
             <HugeiconsIcon icon={Edit01Icon} size={18} color={palette.warning} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDeleteLesson(lesson._id)}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => reading._id && handleDeleteReading(reading._id)}
+          >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Lesson Info */}
+      {reading.lesson && (
+        <View style={styles.lessonInfo}>
+          <Text style={styles.lessonText}>
+              Bài học: {typeof reading.lesson === 'object' ? reading.lesson.title : reading.lesson}
+          </Text>
+        </View>
+      )}
 
       {/* Meta Info */}
       <View style={styles.metaInfo}>
@@ -142,68 +256,93 @@ const ReadingTab: React.FC = () => {
         </View>
         <View style={styles.metaItem}>
           <HugeiconsIcon icon={HelpCircleIcon} size={14} color={colors.light.textSecondary} />
-          <Text style={styles.metaText}>{lesson.questions.length} câu hỏi</Text>
+          <Text style={styles.metaText}>{reading.questions?.length || 0} câu hỏi</Text>
         </View>
-        <View style={styles.metaItem}>
-          <HugeiconsIcon icon={InformationCircleIcon} size={14} color={colors.light.textSecondary} />
-          <Text style={styles.metaText}>{lesson.content.length} ký tự</Text>
-        </View>
+        {reading.viewCount !== undefined && (
+          <View style={styles.metaItem}>
+            <HugeiconsIcon icon={InformationCircleIcon} size={14} color={colors.light.textSecondary} />
+            <Text style={styles.metaText}>{reading.viewCount} lượt xem</Text>
+          </View>
+        )}
       </View>
 
-      {/* Content Section */}
+      {/* Content Preview */}
       <View style={styles.contentSection}>
         <View style={styles.textContainer}>
           <View style={styles.textHeader}>
             <HugeiconsIcon icon={LicenseDraftIcon} size={14} color={colors.light.text} />
             <Text style={styles.sectionHeaderTitle}>Nội dung:</Text>
           </View>
-          <Text style={styles.contentText}>{lesson.content}</Text>
+          <Text style={styles.contentText} numberOfLines={3}>
+            {reading.content}
+          </Text>
         </View>
 
-        {lesson.translation && (
-          <View style={[styles.textContainer, { backgroundColor: colors.light.primary + '05', borderColor: colors.light.primary + '20' }]}>
+        {reading.translation && (
+          <View style={[styles.textContainer, { backgroundColor: colors.light.primary + '05' }]}>
             <View style={styles.textHeader}>
               <HugeiconsIcon icon={TranslateIcon} size={14} color={colors.light.primary} />
               <Text style={[styles.sectionHeaderTitle, { color: colors.light.primary }]}>Dịch:</Text>
             </View>
-            <Text style={styles.translationText}>{lesson.translation}</Text>
+            <Text style={styles.translationText} numberOfLines={2}>
+              {reading.translation}
+            </Text>
           </View>
         )}
       </View>
 
       {/* Questions Preview */}
-      <View style={styles.questionsSection}>
-        <View style={styles.questionSectionHeader}>
-          <Text style={styles.questionSectionTitle}>Câu hỏi ({lesson.questions.length})</Text>
-        </View>
-        {lesson.questions.map((q, i) => (
-          <View key={q._id} style={styles.questionItem}>
-            <Text style={styles.questionText}>{i + 1}. {q.question}</Text>
-            <View style={styles.optionsGrid}>
-              {q.options.map((opt, optIdx) => (
-                <Text key={optIdx} style={[
-                  styles.optionText,
-                  optIdx === q.answer && styles.correctOptionText
-                ]}>
-                  {String.fromCharCode(65 + optIdx)}. {opt} {optIdx === q.answer ? '✓' : ''}
-                </Text>
-              ))}
-            </View>
-            {q.explanation && (
-              <Text style={styles.explanationText}>💡 {q.explanation}</Text>
-            )}
+      {reading.questions && reading.questions.length > 0 && (
+        <View style={styles.questionsSection}>
+          <View style={styles.questionSectionHeader}>
+            <Text style={styles.questionSectionTitle}>
+              Câu hỏi ({reading.questions.length})
+            </Text>
           </View>
-        ))}
-      </View>
+          {reading.questions.slice(0, 2).map((q, i) => (
+            <View key={q._id || i} style={styles.questionItem}>
+              <Text style={styles.questionText} numberOfLines={1}>
+                {i + 1}. {q.question}
+              </Text>
+            </View>
+          ))}
+          {reading.questions.length > 2 && (
+            <Text style={styles.moreQuestionsText}>
+              ...và {reading.questions.length - 2} câu hỏi khác
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Tags */}
+      {reading.tags && reading.tags.length > 0 && (
+        <View style={styles.tagsContainer}>
+          {reading.tags.slice(0, 3).map((tag, index) => (
+            <View key={index} style={styles.tag}>
+              <Text style={styles.tagText}>#{tag}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 
+  // Loading state
+  if (loading && readings.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.light.primary} />
+        <Text style={styles.loadingText}>Đang tải bài đọc...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header với search */}
       <View style={styles.header}>
         <View style={styles.searchContainer}>
-          <HugeiconsIcon icon={Search01Icon} size={20} color={colors.light.textSecondary} style={styles.searchIcon} />
+          <HugeiconsIcon icon={Search01Icon} size={20} color={colors.light.textSecondary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm kiếm bài đọc..."
@@ -211,91 +350,369 @@ const ReadingTab: React.FC = () => {
             onChangeText={setSearchTerm}
             placeholderTextColor={colors.light.textSecondary}
           />
+          {searchTerm ? (
+            <TouchableOpacity onPress={() => setSearchTerm('')}>
+              <HugeiconsIcon icon={Delete02Icon} size={16} color={colors.light.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        
+
         <Button
           title="Thêm mới"
           variant="primary"
           size="small"
-          onPress={handleAddLesson}
+          onPress={handleAddReading}
           leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
         />
       </View>
-      
+
+      {/* Result count */}
       <View style={styles.resultCount}>
-        <Text style={styles.resultCountText}>Tổng {filteredData.length} bài đọc</Text>
+        <Text style={styles.resultCountText}>
+          {lessonId ? `Bài đọc trong bài học (${readings.length})` : `Tổng ${readings.length} bài đọc`}
+        </Text>
+        {searchTerm ? (
+          <Text style={styles.searchResultText}>
+            Kết quả tìm kiếm: "{searchTerm}"
+          </Text>
+        ) : null}
       </View>
 
-      {/* Content List */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filteredData.length > 0 ? (
-          filteredData.map(renderReadingCard)
+      {/* Reading List */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const paddingToBottom = 20;
+          if (
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - paddingToBottom
+          ) {
+            handleLoadMore();
+          }
+        }}
+        scrollEventThrottle={400}
+      >
+        {readings.length > 0 ? (
+          <>
+            {readings.map(renderReadingCard)}
+            {hasMore && (
+              <View style={styles.loadMoreContainer}>
+                <ActivityIndicator size="small" color={colors.light.primary} />
+                <Text style={styles.loadMoreText}>Đang tải thêm...</Text>
+              </View>
+            )}
+          </>
         ) : (
           <View style={styles.emptyState}>
-            <HugeiconsIcon icon={File01Icon} size={48} color={colors.light.border} />
-            <Text style={styles.emptyStateText}>Không tìm thấy bài đọc nào</Text>
+            <HugeiconsIcon icon={File01Icon} size={64} color={colors.light.border} />
+            <Text style={styles.emptyStateTitle}>
+              {searchTerm ? 'Không tìm thấy bài đọc' : 'Chưa có bài đọc nào'}
+            </Text>
+            <Text style={styles.emptyStateSubtitle}>
+              {searchTerm
+                ? 'Thử tìm kiếm với từ khóa khác'
+                : lessonId
+                ? 'Bấm "Thêm mới" để tạo bài đọc đầu tiên'
+                : 'Không có bài đọc nào trong hệ thống'}
+            </Text>
+            {!searchTerm && (
+              <Button
+                title="Tạo bài đọc đầu tiên"
+                variant="primary"
+                onPress={handleAddReading}
+                style={styles.emptyStateButton}
+              />
+            )}
           </View>
         )}
       </ScrollView>
 
-      {/* Modal */}
+      {/* Reading Modal */}
       <ModalReading
         isVisible={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        reading={editingLesson}
-        onSave={handleSaveLesson}
+        reading={editingReading}
+        onSave={handleSaveReading}
         isAdding={isAdding}
+        lessonId={lessonId}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.light.background },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  searchContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.light.card, borderWidth: 1, borderColor: colors.light.border, borderRadius: 8, paddingHorizontal: 12, height: 40 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: typography.fontSizes.sm, color: colors.light.text, fontFamily: typography.fonts.regular, padding: 0 },
-  resultCount: { paddingHorizontal: 16, paddingBottom: 8 },
-  resultCountText: { fontSize: typography.fontSizes.xs, color: colors.light.textSecondary },
-  
-  scrollView: { flex: 1 },
-  scrollContent: { padding: 16, gap: 16, paddingTop: 0 },
-  
-  card: { backgroundColor: colors.light.card, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.light.border, shadowColor: colors.light.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  cardTitle: { fontSize: typography.fontSizes.md, fontFamily: typography.fonts.bold, color: colors.light.text, marginBottom: 6, flex: 1 },
-  levelBadge: { backgroundColor: colors.light.primary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-  levelText: { fontSize: typography.fontSizes.xs, fontFamily: typography.fonts.semiBold, color: colors.light.primary },
-  
-  actionButtons: { flexDirection: 'row', gap: 8 },
-  actionButton: { padding: 8, borderRadius: 8 },
-  editButton: { backgroundColor: palette.warning + '15' },
-  deleteButton: { backgroundColor: palette.error + '15' },
-  
-  metaInfo: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: typography.fontSizes.xs, color: colors.light.textSecondary },
-  
-  contentSection: { gap: 12, marginBottom: 16 },
-  textContainer: { backgroundColor: colors.light.background, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.light.border + '50' },
-  textHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  sectionHeaderTitle: { fontSize: typography.fontSizes.xs, fontFamily: typography.fonts.bold, color: colors.light.text },
-  contentText: { fontSize: typography.fontSizes.sm, color: colors.light.text, lineHeight: 20 },
-  translationText: { fontSize: typography.fontSizes.sm, color: colors.light.textSecondary, fontStyle: 'italic', lineHeight: 20 },
-  
-  questionsSection: { borderTopWidth: 1, borderColor: colors.light.border, paddingTop: 12 },
-  questionSectionHeader: { marginBottom: 8 },
-  questionSectionTitle: { fontSize: typography.fontSizes.sm, fontFamily: typography.fonts.bold, color: colors.light.primary },
-  questionItem: { marginBottom: 12 },
-  questionText: { fontSize: typography.fontSizes.sm, fontFamily: typography.fonts.semiBold, color: colors.light.text, marginBottom: 4 },
-  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionText: { fontSize: typography.fontSizes.xs, color: colors.light.textSecondary },
-  correctOptionText: { color: palette.success, fontFamily: typography.fonts.bold },
-  explanationText: { fontSize: typography.fontSizes.xs, color: palette.info, marginTop: 4, fontStyle: 'italic' },
-
-  emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyStateText: { marginTop: 12, fontSize: typography.fontSizes.md, color: colors.light.textSecondary },
+  container: {
+    flex: 1,
+    backgroundColor: colors.light.background,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.textSecondary,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.light.card,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.text,
+    fontFamily: typography.fonts.regular,
+    padding: 0,
+  },
+  resultCount: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  resultCountText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.semiBold,
+    color: colors.light.text,
+  },
+  searchResultText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+    marginTop: 2,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    gap: 16,
+    paddingTop: 0,
+  },
+  card: {
+    backgroundColor: colors.light.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    shadowColor: colors.light.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  cardHeaderLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  cardTitle: {
+    fontSize: typography.fontSizes.md,
+    fontFamily: typography.fonts.bold,
+    color: colors.light.text,
+    marginBottom: 8,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  levelBadge: {
+    backgroundColor: colors.light.primary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  levelText: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fonts.semiBold,
+    color: colors.light.primary,
+  },
+  difficultyBadge: {
+    backgroundColor: colors.light.secondary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  difficultyText: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fonts.semiBold,
+    color: colors.light.secondary,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  editButton: {
+    backgroundColor: palette.warning + '15',
+  },
+  deleteButton: {
+    backgroundColor: palette.error + '15',
+  },
+  lessonInfo: {
+    backgroundColor: colors.light.background,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  lessonText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+  },
+  metaInfo: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+  },
+  contentSection: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  textContainer: {
+    backgroundColor: colors.light.background,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.light.border + '50',
+  },
+  textHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  sectionHeaderTitle: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fonts.bold,
+    color: colors.light.text,
+  },
+  contentText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.text,
+    lineHeight: 20,
+  },
+  translationText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.textSecondary,
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  questionsSection: {
+    borderTopWidth: 1,
+    borderColor: colors.light.border,
+    paddingTop: 12,
+    marginBottom: 12,
+  },
+  questionSectionHeader: {
+    marginBottom: 8,
+  },
+  questionSectionTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.bold,
+    color: colors.light.primary,
+  },
+  questionItem: {
+    marginBottom: 4,
+  },
+  questionText: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.regular,
+    color: colors.light.text,
+  },
+  moreQuestionsText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tag: {
+    backgroundColor: colors.light.background,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+  },
+  tagText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+  },
+  loadMoreContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.textSecondary,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyStateTitle: {
+    fontSize: typography.fontSizes.md,
+    fontFamily: typography.fonts.bold,
+    color: colors.light.text,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    marginTop: 20,
+  },
 });
 
 export default ReadingTab;

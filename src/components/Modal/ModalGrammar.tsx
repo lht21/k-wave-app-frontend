@@ -14,38 +14,36 @@ import {
   Cancel01Icon,
   Add01Icon,
   Delete02Icon,
+  ArrowDown01Icon,
 } from '@hugeicons/core-free-icons';
 
 import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 
-// Types
-interface ExampleSentence {
-  korean: string;
-  vietnamese: string;
-}
-
-interface Grammar {
-  _id: string;
-  structure: string;
-  meaning: string;
-  explanation: string;
-  usage: string;
-  level: string;
-  exampleSentences: ExampleSentence[];
-  similarGrammar: string[];
-}
+// Import Grammar interface từ service
+import { Grammar, ExampleSentence } from '../../services/grammarService';
 
 interface ModalGrammarProps {
   isVisible: boolean;
   onClose: () => void;
-  grammar?: Grammar | null;
+  grammar?: Grammar | null; // Sử dụng Grammar từ service
   onSave: (grammarData: Grammar) => void;
   isAdding?: boolean;
+  lessonLevel?: string;
 }
 
-type GrammarFormData = Omit<Grammar, '_id'>;
+// Type cho form data (bỏ _id)
+type GrammarFormData = Omit<Grammar, '_id' | 'isActive' | 'viewCount' | 'difficulty' | 'tags'>;
+
+const levelOptions = [
+  'Sơ cấp 1',
+  'Sơ cấp 2',
+  'Trung cấp 1',
+  'Trung cấp 2',
+  'Cao cấp 1',
+  'Cao cấp 2',
+];
 
 const ModalGrammar: React.FC<ModalGrammarProps> = ({
   isVisible,
@@ -53,44 +51,52 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
   grammar,
   onSave,
   isAdding = false,
+  lessonLevel = 'Sơ cấp 1',
 }) => {
   const [formData, setFormData] = useState<GrammarFormData>({
     structure: '',
     meaning: '',
     explanation: '',
     usage: '',
-    level: 'Sơ cấp 1',
+    level: lessonLevel,
     exampleSentences: [{ korean: '', vietnamese: '' }],
     similarGrammar: [''],
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showLevelDropdown, setShowLevelDropdown] = useState(false);
 
   useEffect(() => {
-    if (grammar) {
+    if (grammar && grammar._id) {
+      // Chỉ set form data khi grammar có _id
       setFormData({
-        structure: grammar.structure,
-        meaning: grammar.meaning,
-        explanation: grammar.explanation,
-        usage: grammar.usage,
-        level: grammar.level,
-        exampleSentences: [...grammar.exampleSentences],
-        similarGrammar: [...grammar.similarGrammar],
+        structure: grammar.structure || '',
+        meaning: grammar.meaning || '',
+        explanation: grammar.explanation || '',
+        usage: grammar.usage || '',
+        level: grammar.level || lessonLevel,
+        exampleSentences: grammar.exampleSentences && grammar.exampleSentences.length > 0 
+          ? [...grammar.exampleSentences] 
+          : [{ korean: '', vietnamese: '' }],
+        similarGrammar: grammar.similarGrammar && grammar.similarGrammar.length > 0 
+          ? [...grammar.similarGrammar] 
+          : [''],
       });
     } else {
-      // Reset form
+      // Reset form với lessonLevel
       setFormData({
         structure: '',
         meaning: '',
         explanation: '',
         usage: '',
-        level: 'Sơ cấp 1',
+        level: lessonLevel,
         exampleSentences: [{ korean: '', vietnamese: '' }],
         similarGrammar: [''],
       });
     }
     setErrors({});
-  }, [grammar, isVisible]);
+    setShowLevelDropdown(false);
+  }, [grammar, isVisible, lessonLevel]);
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -105,6 +111,10 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
 
     if (!formData.explanation.trim()) {
       newErrors.explanation = 'Vui lòng nhập giải thích';
+    }
+
+    if (!formData.level.trim()) {
+      newErrors.level = 'Vui lòng chọn cấp độ';
     }
 
     setErrors(newErrors);
@@ -122,11 +132,21 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
     );
     const filteredSimilar = formData.similarGrammar.filter(sg => sg.trim());
 
+    // Tạo saveData với _id từ grammar hoặc tạo mới
     const saveData: Grammar = {
-      _id: grammar?._id || Date.now().toString(),
-      ...formData,
-      exampleSentences: filteredExamples.length > 0 ? filteredExamples : [{ korean: '', vietnamese: '' }],
+      _id: grammar?._id || '', // Sử dụng string rỗng nếu không có _id
+      structure: formData.structure,
+      meaning: formData.meaning,
+      explanation: formData.explanation,
+      usage: formData.usage,
+      level: formData.level,
+      exampleSentences: filteredExamples.length > 0 
+        ? filteredExamples 
+        : [{ korean: '', vietnamese: '' }],
       similarGrammar: filteredSimilar.length > 0 ? filteredSimilar : [''],
+      // Thêm các field optional khác
+      isActive: grammar?.isActive || true,
+      viewCount: grammar?.viewCount || 0,
     };
 
     onSave(saveData);
@@ -161,6 +181,8 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
         ...formData.exampleSentences,
         { korean: '', vietnamese: '' },
       ]);
+    } else {
+      Alert.alert('Thông báo', 'Tối đa 5 ví dụ cho mỗi ngữ pháp');
     }
   };
 
@@ -180,6 +202,8 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
   const addSimilarGrammar = (): void => {
     if (formData.similarGrammar.length < 5) {
       handleFieldChange('similarGrammar', [...formData.similarGrammar, '']);
+    } else {
+      Alert.alert('Thông báo', 'Tối đa 5 ngữ pháp tương đồng');
     }
   };
 
@@ -190,10 +214,19 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
     }
   };
 
+  const handleLevelSelect = (level: string): void => {
+    handleFieldChange('level', level);
+    setShowLevelDropdown(false);
+  };
+
   const handleClose = (): void => {
     setErrors({});
+    setShowLevelDropdown(false);
     onClose();
   };
+
+  // Rest of the component remains the same...
+  // [Component JSX phần dưới giữ nguyên]
 
   return (
     <Modal
@@ -214,7 +247,7 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Cấu trúc */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>
@@ -252,14 +285,39 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
                   Cấp độ <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={styles.selectContainer}>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.level}
-                    onChangeText={(text) => handleFieldChange('level', text)}
-                    placeholder="Chọn cấp độ"
-                    placeholderTextColor={colors.light.textSecondary}
-                  />
+                  <TouchableOpacity
+                    style={[styles.selectInput, errors.level && styles.inputError]}
+                    onPress={() => setShowLevelDropdown(!showLevelDropdown)}
+                  >
+                    <Text style={styles.selectText}>
+                      {formData.level || 'Chọn cấp độ'}
+                    </Text>
+                    <HugeiconsIcon icon={ArrowDown01Icon} size={20} color={colors.light.textSecondary} />
+                  </TouchableOpacity>
+                  
+                  {showLevelDropdown && (
+                    <View style={styles.dropdown}>
+                      {levelOptions.map((level) => (
+                        <TouchableOpacity
+                          key={level}
+                          style={[
+                            styles.dropdownItem,
+                            formData.level === level && styles.dropdownItemSelected
+                          ]}
+                          onPress={() => handleLevelSelect(level)}
+                        >
+                          <Text style={[
+                            styles.dropdownItemText,
+                            formData.level === level && styles.dropdownItemTextSelected
+                          ]}>
+                            {level}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
+                {errors.level && <Text style={styles.errorText}>{errors.level}</Text>}
               </View>
             </View>
 
@@ -284,11 +342,13 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Cách dùng</Text>
               <TextInput
-                style={styles.input}
+                style={styles.textArea}
                 value={formData.usage}
                 onChangeText={(text) => handleFieldChange('usage', text)}
                 placeholder="VD: Dùng trong câu trần thuật"
                 placeholderTextColor={colors.light.textSecondary}
+                multiline
+                numberOfLines={2}
               />
             </View>
 
@@ -313,7 +373,7 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
                         style={styles.input}
                         value={example.korean}
                         onChangeText={(text) => handleExampleChange(index, 'korean', text)}
-                        placeholder="VD: 화입니다."
+                        placeholder="VD: 저는 학생입니다."
                         placeholderTextColor={colors.light.textSecondary}
                       />
                     </View>
@@ -323,7 +383,7 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
                         style={styles.input}
                         value={example.vietnamese}
                         onChangeText={(text) => handleExampleChange(index, 'vietnamese', text)}
-                        placeholder="VD: Tôi là Hoa."
+                        placeholder="VD: Tôi là học sinh."
                         placeholderTextColor={colors.light.textSecondary}
                       />
                     </View>
@@ -359,7 +419,7 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
                     style={styles.input}
                     value={similar}
                     onChangeText={(text) => handleSimilarGrammarChange(index, text)}
-                    placeholder="VD: 회사원입니다."
+                    placeholder="VD: N + 이다"
                     placeholderTextColor={colors.light.textSecondary}
                   />
                   {formData.similarGrammar.length > 1 && (
@@ -379,14 +439,13 @@ const ModalGrammar: React.FC<ModalGrammarProps> = ({
           <View style={styles.modalFooter}>
             <Button
               title="Hủy"
-              variant="primary"
+              variant="outline"
               onPress={handleClose}
             />
             <Button
               title={isAdding ? 'Thêm mới' : 'Cập nhật'}
               variant="primary"
               onPress={handleSave}
-              size='small'
             />
           </View>
         </View>
@@ -407,7 +466,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.light.background,
     borderRadius: 12,
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: '90%',
     shadowColor: colors.light.black,
     shadowOffset: {
       width: 0,
@@ -435,7 +494,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalContent: {
-    maxHeight: 400,
     padding: 16,
   },
   inputGroup: {
@@ -490,6 +548,56 @@ const styles = StyleSheet.create({
   },
   selectContainer: {
     position: 'relative',
+  },
+  selectInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: colors.light.card,
+  },
+  selectText: {
+    fontSize: typography.fontSizes.md,
+    fontFamily: typography.fonts.regular,
+    color: colors.light.text,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.light.background,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    borderRadius: 8,
+    marginTop: 4,
+    zIndex: 1000,
+    maxHeight: 200,
+    elevation: 5,
+    shadowColor: colors.light.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border + '30',
+  },
+  dropdownItemSelected: {
+    backgroundColor: colors.light.primary + '15',
+  },
+  dropdownItemText: {
+    fontSize: typography.fontSizes.md,
+    fontFamily: typography.fonts.regular,
+    color: colors.light.text,
+  },
+  dropdownItemTextSelected: {
+    color: colors.light.primary,
+    fontFamily: typography.fonts.semiBold,
   },
   examplesHeader: {
     flexDirection: 'row',

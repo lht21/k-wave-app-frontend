@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// src/components/LessonDetailTab/GrammarTab.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +7,8 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  TextInput,
+  ActivityIndicator
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -15,89 +18,54 @@ import {
   InformationDiamondIcon,
   LicenseDraftIcon,
   LinkIcon,
+  Search01Icon,
 } from '@hugeicons/core-free-icons';
 
 import Button from '../../components/Button/Button';
 import ModalGrammar from '../Modal/ModalGrammar';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-
-// Types
-interface ExampleSentence {
-  korean: string;
-  vietnamese: string;
-}
-
-interface Grammar {
-  _id: string;
-  structure: string;
-  meaning: string;
-  explanation: string;
-  usage: string;
-  level: string;
-  exampleSentences: ExampleSentence[];
-  similarGrammar: string[];
-}
+import { grammarService, Grammar } from '../../services/grammarService';
 
 interface GrammarTabProps {
-  grammarData?: Grammar[];
+  lessonId: string; 
+  lessonLevel?: string; 
 }
 
-const initialGrammarData: Grammar[] = [
-  {
-    _id: '1',
-    structure: 'Danh từ + 이/가 아닙니다',
-    meaning: 'không phải là (danh từ)',
-    explanation: 'Dạng phủ định của "입니다". Dùng khi nói lịch sự.',
-    usage: 'Dùng trong câu trần thuật phủ định.',
-    level: 'Sơ cấp 1',
-    exampleSentences: [
-      { korean: '저는 학생이 아닙니다.', vietnamese: 'Tôi không phải là học sinh.' },
-      { korean: '여기는 학교가 아닙니다.', vietnamese: 'Đây không phải là trường học.' }
-    ],
-    similarGrammar: ['이/가 아니다', '아니에요', '아닙니까?']
-  },
-  {
-    _id: '2',
-    structure: 'Động từ/ Tính từ + -습니다/ -ㅂ니다',
-    meaning: 'đuôi câu trần thuật lịch sự',
-    explanation: 'Được dùng trong văn viết hoặc hoàn cảnh trang trọng.',
-    usage: 'Dùng để kết thúc câu trần thuật hoặc mô tả lịch sự.',
-    level: 'Sơ cấp 1',
-    exampleSentences: [
-      { korean: '저는 베트남에서 왔습니다.', vietnamese: 'Tôi đến từ Việt Nam.' },
-      { korean: '한국어를 공부합니다.', vietnamese: 'Tôi học tiếng Hàn.' }
-    ],
-    similarGrammar: ['아요/어요', '-지요', '-네요']
-  },
-  {
-    _id: '3',
-    structure: 'Danh từ + 에서',
-    meaning: 'ở (nơi diễn ra hành động)',
-    explanation: 'Chỉ nơi chốn xảy ra hành động (khác với 에 chỉ vị trí tồn tại).',
-    usage: 'Dùng sau danh từ chỉ địa điểm.',
-    level: 'Sơ cấp 1',
-    exampleSentences: [
-      { korean: '학교에서 공부합니다.', vietnamese: 'Tôi học ở trường.' },
-      { korean: '회사에서 일합니다.', vietnamese: 'Tôi làm việc ở công ty.' }
-    ],
-    similarGrammar: ['에', '으로', '에서부터']
-  },
-];
-
 const GrammarTab: React.FC<GrammarTabProps> = ({
-  grammarData = initialGrammarData,
+  lessonId, 
+  lessonLevel = 'Sơ cấp 1',
 }) => {
-  const [data, setData] = useState<Grammar[]>(grammarData);
+  const [data, setData] = useState<Grammar[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGrammar, setEditingGrammar] = useState<Grammar | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleEditGrammar = (grammarItem: Grammar): void => {
-    setEditingGrammar(grammarItem);
-    setIsAdding(false);
-    setIsModalOpen(true);
+  // Load grammar từ API
+  const loadGrammar = async () => {
+    try {
+      setLoading(true);
+      const response = await grammarService.getGrammarByLesson(lessonId, {
+        search: searchTerm,
+        limit: 50
+      });
+      setData(response.grammar);
+    } catch (error: any) {
+      console.error('Error loading grammar:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể tải ngữ pháp');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    if (lessonId) {
+      loadGrammar();
+    }
+  }, [lessonId, searchTerm]);
+
 
   const handleAddGrammar = (): void => {
     setEditingGrammar(null);
@@ -105,7 +73,13 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleDeleteGrammar = (grammarId: string): void => {
+  const handleEditGrammar = (grammarItem: Grammar): void => {
+    setEditingGrammar(grammarItem);
+    setIsAdding(false);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteGrammar = async (grammarId: string): Promise<void> => {
     Alert.alert(
       'Xác nhận xóa',
       'Bạn có chắc chắn muốn xóa ngữ pháp này?',
@@ -114,31 +88,47 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            setData(prev => prev.filter(item => item._id !== grammarId));
+          onPress: async () => {
+            try {
+              await grammarService.deleteGrammar(grammarId);
+              Alert.alert('Thành công', 'Đã xóa ngữ pháp');
+              loadGrammar();
+            } catch (error: any) {
+              Alert.alert('Lỗi', error.message || 'Không thể xóa ngữ pháp');
+            }
           },
         },
       ]
     );
   };
 
-  const handleSaveGrammar = (grammarData: Grammar): void => {
-    if (isAdding) {
-      // Thêm mới
-      const newGrammar: Grammar = {
-        ...grammarData,
-        _id: Date.now().toString(),
-      };
-      setData(prev => [...prev, newGrammar]);
-    } else {
-      // Cập nhật
-      setData(prev =>
-        prev.map(g => g._id === grammarData._id ? grammarData : g)
-      );
+  // ✅ SỬA: Sử dụng API mới cho lesson
+  const handleSaveGrammar = async (grammarData: Grammar): Promise<void> => {
+    try {
+      if (isAdding) {
+        // ✅ DÙNG API MỚI: Tạo grammar cho lesson
+        const newGrammar = await grammarService.createGrammarForLesson(
+          lessonId,
+          grammarData
+        );
+        Alert.alert('Thành công', 'Đã thêm ngữ pháp mới');
+      } else if (editingGrammar && editingGrammar._id) {
+        // Update grammar (vẫn dùng API cũ)
+        await grammarService.updateGrammar(editingGrammar._id, grammarData);
+        Alert.alert('Thành công', 'Đã cập nhật ngữ pháp');
+      }
+      
+      // Reload data
+      await loadGrammar();
+      
+      // Close modal
+      setIsModalOpen(false);
+      setEditingGrammar(null);
+      setIsAdding(false);
+    } catch (error: any) {
+      console.error('Error saving grammar:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể lưu ngữ pháp');
     }
-    setIsModalOpen(false);
-    setEditingGrammar(null);
-    setIsAdding(false);
   };
 
   const handleCloseModal = (): void => {
@@ -167,7 +157,7 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteGrammar(grammar._id)}
+            onPress={() => grammar._id && handleDeleteGrammar(grammar._id)}
           >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
@@ -200,7 +190,7 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
       </View>
 
       {/* Ví dụ minh họa */}
-      {grammar.exampleSentences.length > 0 && (
+      {grammar.exampleSentences && grammar.exampleSentences.length > 0 && (
         <View style={styles.examplesSection}>
           <View style={styles.sectionHeader}>
             <HugeiconsIcon icon={LicenseDraftIcon} size={16} color={palette.success} />
@@ -224,7 +214,7 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
       )}
 
       {/* Ngữ pháp tương đồng */}
-      {grammar.similarGrammar.length > 0 && (
+      {grammar.similarGrammar && grammar.similarGrammar.length > 0 && (
         <View style={styles.similarSection}>
           <View style={styles.sectionHeader}>
             <HugeiconsIcon icon={LinkIcon} size={16} color={palette.purple} />
@@ -243,22 +233,45 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.light.primary} />
+        <Text style={styles.loadingText}>Đang tải ngữ pháp...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header với search */}
       <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>NGỮ PHÁP</Text>
-          <Text style={styles.subtitle}>Tổng hợp ngữ pháp từ sơ cấp đến cao cấp</Text>
+      
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBox}>
+            <HugeiconsIcon 
+              icon={Search01Icon} 
+              size={20} 
+              color={colors.light.textSecondary}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm kiếm ngữ pháp..."
+              placeholderTextColor={colors.light.textSecondary}
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+            />
+          </View>
+          
+          <Button
+            title="Thêm"
+            variant="primary"
+            size="small"
+            onPress={handleAddGrammar}
+            leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
+          />
         </View>
-        
-        <Button
-          title="Thêm ngữ pháp"
-          variant="primary"
-          size="small"
-          onPress={handleAddGrammar}
-          leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
-        />
       </View>
 
       {/* Content */}
@@ -274,17 +287,24 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
         ) : (
           <View style={styles.emptyState}>
             <HugeiconsIcon icon={LicenseDraftIcon} size={48} color={colors.light.border} />
-            <Text style={styles.emptyTitle}>Chưa có nội dung ngữ pháp</Text>
-            <Text style={styles.emptyDescription}>
-              Bắt đầu xây dựng bộ ngữ pháp của bạn
+            <Text style={styles.emptyTitle}>
+              {searchTerm ? 'Không tìm thấy kết quả' : 'Chưa có nội dung ngữ pháp'}
             </Text>
-            <Button
-              title="Thêm ngữ pháp đầu tiên"
-              variant="primary"
-              onPress={handleAddGrammar}
-              size='small'
-              leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
-            />
+            <Text style={styles.emptyDescription}>
+              {searchTerm 
+                ? 'Hãy thử tìm kiếm với từ khóa khác'
+                : 'Bắt đầu xây dựng bộ ngữ pháp của bạn'
+              }
+            </Text>
+            {!searchTerm && (
+              <Button
+                title="Thêm ngữ pháp đầu tiên"
+                variant="primary"
+                onPress={handleAddGrammar}
+                size='small'
+                leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
+              />
+            )}
           </View>
         )}
       </View>
@@ -296,6 +316,7 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
         grammar={editingGrammar}
         onSave={handleSaveGrammar}
         isAdding={isAdding}
+        lessonLevel={lessonLevel}
       />
     </View>
   );
@@ -306,26 +327,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.light.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 16,
-    backgroundColor: colors.light.background,
-  },
-  headerText: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: {
-    fontSize: typography.fontSizes.lg,
-    fontFamily: typography.fonts.bold,
-    color: colors.light.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: typography.fontSizes.sm,
+  loadingText: {
+    marginTop: 12,
+    fontSize: typography.fontSizes.md,
     color: colors.light.textSecondary,
     fontFamily: typography.fonts.regular,
+  },
+  header: {
+    padding: 16,
+    backgroundColor: colors.light.background,
+    gap: 12,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    borderRadius: 24,
+    backgroundColor: colors.light.card,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.regular,
+    color: colors.light.text,
   },
   content: {
     flex: 1,

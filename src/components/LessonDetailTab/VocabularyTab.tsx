@@ -1,4 +1,5 @@
-import React from 'react';
+// src/components/LessonDetailTab/VocabularyTab.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +8,7 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  ActivityIndicator
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
@@ -22,46 +24,70 @@ import * as Speech from 'expo-speech';
 import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-
-// Types
-interface Vocabulary {
-  id: number;
-  word: string;
-  pronunciation: string;
-  meaning: string;
-  type: string;
-  category: string;
-  dateAdded: string;
-  examples: string[];
-}
+import { Vocabulary } from '../../services/vocabularyService';
 
 interface VocabularyTabProps {
   vocabulary?: Vocabulary[];
+  loading?: boolean;
   searchTerm?: string;
   onSearchChange?: (value: string) => void;
   onAddVocabulary?: () => void;
   onEditVocabulary?: (vocab: Vocabulary) => void;
-  onDeleteVocabulary?: (vocabId: number) => void;
+  onDeleteVocabulary?: (vocabId: string) => void;
 }
 
 const VocabularyTab: React.FC<VocabularyTabProps> = ({
   vocabulary = [],
+  loading = false,
   searchTerm = '',
   onSearchChange = () => {},
   onAddVocabulary = () => {},
   onEditVocabulary = () => {},
   onDeleteVocabulary = () => {},
 }) => {
-  const [speakingWord, setSpeakingWord] = React.useState<number | null>(null);
+  const [speakingWord, setSpeakingWord] = useState<string | null>(null);
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Filter vocabulary based on search term
+  // Filter vocabulary locally first (client-side filtering)
   const filteredVocabulary = vocabulary.filter(item => 
-    item.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.meaning.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.pronunciation.toLowerCase().includes(searchTerm.toLowerCase())
+    item.word.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
+    item.meaning.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
+    (item.pronunciation && item.pronunciation.toLowerCase().includes(localSearchTerm.toLowerCase()))
   );
 
-  const handleDeletePress = (vocabId: number, word: string): void => {
+  // Debounce search - wait 500ms before calling onSearchChange
+  const handleSearchChange = useCallback((text: string) => {
+    setLocalSearchTerm(text);
+    
+    // Clear existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    // Set new timer for 500ms
+    const timer = setTimeout(() => {
+      onSearchChange(text);
+    }, 500);
+    
+    setDebounceTimer(timer);
+  }, [debounceTimer, onSearchChange]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [debounceTimer]);
+
+  // Update local search term when prop changes (from parent)
+  useEffect(() => {
+    setLocalSearchTerm(searchTerm);
+  }, [searchTerm]);
+
+  const handleDeletePress = (vocabId: string, word: string): void => {
     Alert.alert(
       'Xác nhận xóa',
       `Bạn có chắc chắn muốn xóa từ "${word}"?`,
@@ -76,9 +102,8 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
     );
   };
 
-  const speakText = async (text: string, wordId: number): Promise<void> => {
+  const speakText = async (text: string, wordId: string): Promise<void> => {
     try {
-      // Dừng phát âm thanh hiện tại nếu có
       await Speech.stop();
       
       setSpeakingWord(wordId);
@@ -118,7 +143,7 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
     }
   };
 
-  const handleSpeakPress = async (text: string, wordId: number): Promise<void> => {
+  const handleSpeakPress = async (text: string, wordId: string): Promise<void> => {
     if (speakingWord === wordId) {
       await stopSpeaking();
     } else {
@@ -126,27 +151,29 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
     }
   };
 
-  const renderVocabularyItem = (item: Vocabulary, index: number): React.ReactElement => (
-    <View key={item.id} style={styles.vocabCard}>
+  const renderVocabularyItem = (item: Vocabulary): React.ReactElement => (
+    <View key={item._id} style={styles.vocabCard}>
       {/* Header Row */}
       <View style={styles.cardHeader}>
         <View style={styles.wordMain}>
           <View style={styles.wordRow}>
             <Text style={styles.wordText}>{item.word}</Text>
-            <Text style={styles.pronunciation}>[{item.pronunciation}]</Text>
+            {item.pronunciation && (
+              <Text style={styles.pronunciation}>[{item.pronunciation}]</Text>
+            )}
           </View>
           <Text style={styles.meaning}>{item.meaning}</Text>
         </View>
         
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.speakBtn, speakingWord === item.id && styles.speakingActive]}
-            onPress={() => handleSpeakPress(item.word, item.id)}
+            style={[styles.speakBtn, speakingWord === item._id && styles.speakingActive]}
+            onPress={() => handleSpeakPress(item.word, item._id!)}
           >
             <HugeiconsIcon 
-              icon={speakingWord === item.id ? VolumeOffIcon : VolumeHighIcon} 
+              icon={speakingWord === item._id ? VolumeOffIcon : VolumeHighIcon} 
               size={20} 
-              color={speakingWord === item.id ? palette.error : colors.light.primary} 
+              color={speakingWord === item._id ? palette.error : colors.light.primary} 
             />
           </TouchableOpacity>
         </View>
@@ -157,9 +184,11 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
         <View style={styles.tag}>
           <Text style={styles.tagText}>{item.type}</Text>
         </View>
-        <View style={[styles.tag, styles.categoryTag]}>
-          <Text style={styles.tagText}>{item.category}</Text>
-        </View>
+        {item.category && (
+          <View style={[styles.tag, styles.categoryTag]}>
+            <Text style={styles.tagText}>{item.category}</Text>
+          </View>
+        )}
         <View style={styles.spacer} />
         <View style={styles.editActions}>
           <TouchableOpacity
@@ -170,7 +199,7 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.deleteBtn}
-            onPress={() => handleDeletePress(item.id, item.word)}
+            onPress={() => handleDeletePress(item._id!, item.word)}
           >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
@@ -178,12 +207,12 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
       </View>
 
       {/* Examples */}
-      {item.examples.length > 0 && (
+      {item.examples && item.examples.length > 0 && (
         <View style={styles.examplesSection}>
           <Text style={styles.examplesLabel}>Ví dụ:</Text>
           <View style={styles.examplesList}>
-            {item.examples.map((example, exampleIndex) => (
-              <Text key={exampleIndex} style={styles.exampleText}>
+            {item.examples.map((example, index) => (
+              <Text key={index} style={styles.exampleText}>
                 • {example}
               </Text>
             ))}
@@ -192,6 +221,15 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
       )}
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.light.primary} />
+        <Text style={styles.loadingText}>Đang tải từ vựng...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -209,9 +247,18 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
               style={styles.searchInput}
               placeholder="Tìm kiếm từ vựng..."
               placeholderTextColor={colors.light.textSecondary}
-              value={searchTerm}
-              onChangeText={onSearchChange}
+              value={localSearchTerm}
+              onChangeText={handleSearchChange}
+              returnKeyType="search"
             />
+            {localSearchTerm.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearSearchButton}
+                onPress={() => handleSearchChange('')}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={styles.resultCount}>
             {filteredVocabulary.length} từ vựng
@@ -240,15 +287,15 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>
-              {searchTerm ? 'Không tìm thấy kết quả' : 'Chưa có từ vựng'}
+              {localSearchTerm ? 'Không tìm thấy kết quả' : 'Chưa có từ vựng'}
             </Text>
             <Text style={styles.emptyDescription}>
-              {searchTerm 
+              {localSearchTerm 
                 ? 'Hãy thử tìm kiếm với từ khóa khác'
                 : 'Bắt đầu xây dựng bộ từ vựng của bạn'
               }
             </Text>
-            {!searchTerm && (
+            {!localSearchTerm && (
               <Button
                 title="Thêm từ vựng đầu tiên"
                 variant="primary"
@@ -264,6 +311,17 @@ const VocabularyTab: React.FC<VocabularyTabProps> = ({
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: typography.fontSizes.md,
+    color: colors.light.textSecondary,
+    fontFamily: typography.fonts.regular,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.light.background,
@@ -275,32 +333,40 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-searchSection: {
-  flex: 1,
-  marginRight: 12,
-},
-searchBox: {
-  flexDirection: 'row',
-  alignItems: 'center',     
-  paddingHorizontal: 12,
-  borderWidth: 1,
-  borderColor: colors.light.border,
-  borderRadius: 24,
-  backgroundColor: colors.light.card,
-},
+  searchSection: {
+    flex: 1,
+    marginRight: 12,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    borderRadius: 24,
+    backgroundColor: colors.light.card,
+    position: 'relative',
+  },
   searchIcon: {
-    position: 'absolute',
-    left: 12,
-    top: 10,
-    zIndex: 1,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    borderColor: colors.light.card,
-    paddingRight: 20,
+    paddingVertical: 12,
     fontSize: typography.fontSizes.sm,
     fontFamily: typography.fonts.regular,
     color: colors.light.text,
+    paddingRight: 40, // Space for clear button
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+  },
+  clearSearchText: {
+    fontSize: 20,
+    color: colors.light.textSecondary,
+    fontWeight: 'bold',
   },
   resultCount: {
     fontSize: typography.fontSizes.sm,

@@ -10,8 +10,6 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeftIcon } from '@hugeicons/core-free-icons';
 
 import Button from '../../../components/Button/Button';
 import ModalVocabulary from '../../../components/Modal/ModalVocabulary';
@@ -23,35 +21,12 @@ import ReadingTab from '../../../components/LessonDetailTab/ReadingTab';
 import WritingTab from '../../../components/LessonDetailTab/WritingTab';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
+import { lessonService, Lesson } from '../../../services/lessonService';
+import { vocabularyService, Vocabulary } from '../../../services/vocabularyService';
 
 // Types
-interface Vocabulary {
-  id: number;
-  word: string;
-  pronunciation: string;
-  meaning: string;
-  type: string;
-  category: string;
-  dateAdded: string;
-  examples: string[];
-}
-
-interface Lesson {
-  id: number;
-  code: string;
-  title: string;
-  description: string;
-  level: string;
-  order: number;
-  estimatedDuration: number;
-  isPremium: boolean;
-  viewCount: number;
-  completionCount: number;
-  vocabulary: Vocabulary[];
-}
-
 interface RootStackParamList {
-  LessonDetail: { lessonId: number };
+  LessonDetail: { lessonId: string };
   [key: string]: object | undefined; 
 }
 
@@ -64,131 +39,56 @@ const LessonDetailScreen: React.FC = () => {
   const { lessonId } = route.params;
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [vocabulary, setVocabulary] = useState<Vocabulary[]>([]);
   const [selectedTab, setSelectedTab] = useState<string>('vocabulary');
-  const [speakingWord, setSpeakingWord] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingVocabulary, setEditingVocabulary] = useState<Vocabulary | null>(null);
   const [isAdding, setIsAdding] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [vocabularyLoading, setVocabularyLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Mock data
-  const allLessons: Lesson[] = [
-    {
-      id: 1,
-      code: 'BÀI 1',
-      title: '0 - 알파벳 Bảng chữ cái',
-      description: 'Tiếng Hàn sơ cấp 1',
-      level: 'Sơ cấp 1',
-      order: 1,
-      estimatedDuration: 60,
-      isPremium: false,
-      viewCount: 150,
-      completionCount: 120,
-      vocabulary: [
-        {
-          id: 1,
-          word: '일출',
-          pronunciation: 'il-chul',
-          meaning: 'mặt trời mọc',
-          type: '명사',
-          category: 'Cảnh trí',
-          dateAdded: '01/07/2005',
-          examples: [
-            '아침에 일출을 보러 갔어요',
-            'Đi ngắm mặt trời mọc vào buổi sáng'
-          ]
-        },
-        {
-          id: 2,
-          word: '사랑',
-          pronunciation: 'sa-rang',
-          meaning: 'tình yêu',
-          type: '명사',
-          category: 'Cảm xúc',
-          dateAdded: '01/07/2005',
-          examples: [
-            '사랑은 아름다워요',
-            'Tình yêu thật đẹp'
-          ]
-        }
-      ]
-    },
-    {
-      id: 2,
-      code: 'BÀI 2',
-      title: '1 - 인사 Chào hỏi',
-      description: 'Tiếng Hàn sơ cấp 1',
-      level: 'Sơ cấp 1',
-      order: 2,
-      estimatedDuration: 75,
-      isPremium: false,
-      viewCount: 89,
-      completionCount: 67,
-      vocabulary: [
-        {
-          id: 3,
-          word: '안녕',
-          pronunciation: 'an-nyeong',
-          meaning: 'xin chào',
-          type: '명사',
-          category: 'Chào hỏi',
-          dateAdded: '01/07/2005',
-          examples: [
-            '안녕하세요',
-            'Xin chào'
-          ]
-        }
-      ]
+  // Load bài học từ API
+  const loadLesson = async () => {
+    try {
+      setLoading(true);
+      const lessonData = await lessonService.getLessonById(lessonId);
+      setLesson(lessonData);
+    } catch (error: any) {
+      console.error('Error loading lesson:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể tải bài học');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Load từ vựng từ API
+  const loadVocabulary = async () => {
+    try {
+      setVocabularyLoading(true);
+      const response = await vocabularyService.getVocabularyByLesson(lessonId, {
+        search: searchTerm,
+        limit: 50
+      });
+      setVocabulary(response.vocabulary);
+    } catch (error: any) {
+      console.error('Error loading vocabulary:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể tải từ vựng');
+    } finally {
+      setVocabularyLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const foundLesson = allLessons.find(lesson => lesson.id === lessonId);
-      
-      if (foundLesson) {
-        setLesson(foundLesson);
-      } else {
-        Alert.alert('Xin lỗi', 'Hiện tại bài học này đang không có sẵn. Xin vui lòng thử lại sau.');
-        navigation.goBack();
-      }
-      setLoading(false);
-    }, 1000);
+    loadLesson();
+  }, [lessonId]);
 
-    return () => clearTimeout(timer);
-  }, [lessonId, navigation]);
-
-  const speakText = (text: string, wordId: number): void => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ko-KR';
-      utterance.rate = 0.8;
-      utterance.pitch = 1;
-      
-      setSpeakingWord(wordId);
-      
-      utterance.onend = () => {
-        setSpeakingWord(null);
-      };
-      
-      utterance.onerror = () => {
-        setSpeakingWord(null);
-        Alert.alert('Lỗi', 'Không thể phát âm thanh. Vui lòng thử lại.');
-      };
-      
-      window.speechSynthesis.speak(utterance);
-    } else {
-      Alert.alert('Lỗi', 'Trình duyệt của bạn không hỗ trợ Text-to-Speech');
+  useEffect(() => {
+    if (selectedTab === 'vocabulary') {
+      loadVocabulary();
     }
-  };
-
-  const stopSpeaking = (): void => {
-    window.speechSynthesis.cancel();
-    setSpeakingWord(null);
-  };
+  }, [selectedTab, searchTerm]);
 
   const handleAddVocabulary = (): void => {
     setIsAdding(true);
@@ -202,7 +102,7 @@ const LessonDetailScreen: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteVocabulary = (vocabId: number): void => {
+  const handleDeleteVocabulary = async (vocabId: string): Promise<void> => {
     Alert.alert(
       'Xác nhận xóa',
       'Bạn có chắc chắn muốn xóa từ vựng này?',
@@ -211,12 +111,14 @@ const LessonDetailScreen: React.FC = () => {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            if (lesson) {
-              setLesson({
-                ...lesson,
-                vocabulary: lesson.vocabulary.filter(v => v.id !== vocabId)
-              });
+          onPress: async () => {
+            try {
+              await vocabularyService.deleteVocabulary(vocabId);
+              Alert.alert('Thành công', 'Đã xóa từ vựng');
+              // Reload vocabulary
+              loadVocabulary();
+            } catch (error: any) {
+              Alert.alert('Lỗi', error.message || 'Không thể xóa từ vựng');
             }
           }
         }
@@ -224,26 +126,28 @@ const LessonDetailScreen: React.FC = () => {
     );
   };
 
-  const handleSaveVocabulary = (formData: Omit<Vocabulary, 'id' | 'dateAdded'>): void => {
-    if (isAdding && lesson) {
-      const newVocabulary: Vocabulary = {
-        id: Date.now(),
-        ...formData,
-        dateAdded: new Date().toLocaleDateString('vi-VN')
-      };
-      setLesson({
-        ...lesson,
-        vocabulary: [...lesson.vocabulary, newVocabulary]
-      });
-    } else if (editingVocabulary && lesson) {
-      setLesson({
-        ...lesson,
-        vocabulary: lesson.vocabulary.map(v => 
-          v.id === editingVocabulary.id ? { ...v, ...formData } : v
-        )
-      });
+  const handleSaveVocabulary = async (formData: Omit<Vocabulary, '_id' | 'lesson' | 'level'>): Promise<void> => {
+    try {
+      if (isAdding && lesson) {
+        // Tạo từ vựng mới cho lesson
+        const savedVocabulary = await vocabularyService.createVocabularyForLesson(lessonId, formData);
+        Alert.alert('Thành công', 'Đã thêm từ vựng mới');
+        // Reload vocabulary
+        loadVocabulary();
+      } else if (editingVocabulary && editingVocabulary._id) {
+        // Cập nhật từ vựng
+        const updatedVocabulary = await vocabularyService.updateVocabulary(editingVocabulary._id, formData);
+        Alert.alert('Thành công', 'Đã cập nhật từ vựng');
+        // Reload vocabulary
+        loadVocabulary();
+      }
+      setIsModalOpen(false);
+      setEditingVocabulary(null);
+      setIsAdding(false);
+    } catch (error: any) {
+      console.error('Error saving vocabulary:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể lưu từ vựng');
     }
-    setIsModalOpen(false);
   };
 
   const handleCloseModal = (): void => {
@@ -271,32 +175,52 @@ const LessonDetailScreen: React.FC = () => {
   ];
 
   const renderTabContent = (): React.ReactElement => {
-    if (!lesson) return <View />;
-
     switch (selectedTab) {
       case 'vocabulary':
         return (
-        <VocabularyTab
-          vocabulary={lesson.vocabulary}
-          searchTerm={searchTerm}
-          onSearchChange={handleSearchChange}
-          onAddVocabulary={handleAddVocabulary}
-          onEditVocabulary={handleEditVocabulary}
-          onDeleteVocabulary={handleDeleteVocabulary}
-        />
-      );
+          <VocabularyTab
+            vocabulary={vocabulary}
+            loading={vocabularyLoading}
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            onAddVocabulary={handleAddVocabulary}
+            onEditVocabulary={handleEditVocabulary}
+            onDeleteVocabulary={handleDeleteVocabulary}
+          />
+        );
       case 'grammar':
-        return <GrammarTab />;
+        return <GrammarTab 
+            lessonId={lessonId} 
+          />
+
       case 'listening':
-        return <ListeningTab />;
+        return <ListeningTab 
+            lessonId={lessonId} 
+          />;
       case 'speaking':
-        return <SpeakingTab />;
+        return <SpeakingTab 
+            lessonId={lessonId} 
+          />;
       case 'reading':
-        return <ReadingTab />;
+        return <ReadingTab 
+            lessonId={lessonId} 
+        />;
       case 'writing':
-        return <WritingTab />;
+        return <WritingTab 
+           lessonId={lessonId} 
+        />;
       default:
-        return <VocabularyTab />;
+        return (
+          <VocabularyTab
+            vocabulary={vocabulary}
+            loading={vocabularyLoading}
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            onAddVocabulary={handleAddVocabulary}
+            onEditVocabulary={handleEditVocabulary}
+            onDeleteVocabulary={handleDeleteVocabulary}
+          />
+        );
     }
   };
 
@@ -326,7 +250,54 @@ const LessonDetailScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.lessonTitle}>{lesson.title}</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.lessonCode}>{lesson.code}</Text>
+          <Text style={styles.lessonTitle}>{lesson.title}</Text>
+          <View style={styles.lessonMeta}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>{lesson.level}</Text>
+            </View>
+            {lesson.isPremium && (
+              <View style={styles.premiumBadge}>
+                <Text style={styles.premiumText}>Premium</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Lesson Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{lesson.viewCount || 0}</Text>
+          <Text style={styles.statLabel}>Lượt xem</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{lesson.completionCount || 0}</Text>
+          <Text style={styles.statLabel}>Hoàn thành</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{lesson.estimatedDuration || 60} phút</Text>
+          <Text style={styles.statLabel}>Thời lượng</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>
+            {lesson.isPremium ? 'Premium' : 'Free'}
+          </Text>
+          <Text style={styles.statLabel}>Trạng thái</Text>
+        </View>
+      </View>
+
+      {/* Description */}
+      <View style={styles.descriptionContainer}>
+        <Text style={styles.descriptionLabel}>Mô tả</Text>
+        <Text style={styles.descriptionText}>{lesson.description}</Text>
       </View>
 
       {/* Tabs Navigation */}
@@ -361,7 +332,6 @@ const LessonDetailScreen: React.FC = () => {
         {renderTabContent()}
       </View>
 
-
       {/* Modal */}
       <ModalVocabulary
         isVisible={isModalOpen}
@@ -378,7 +348,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.light.background,
-    marginBottom: 40
   },
   loadingContainer: {
     flex: 1,
@@ -410,24 +379,106 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     backgroundColor: colors.light.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  backButton: {
+    marginRight: 12,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: colors.light.text,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  lessonCode: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.textSecondary,
+    fontFamily: typography.fonts.regular,
+    marginBottom: 2,
   },
   lessonTitle: {
     fontSize: typography.fontSizes.lg,
     fontFamily: typography.fonts.bold,
     color: colors.light.text,
+    marginBottom: 8,
+  },
+  lessonMeta: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  levelBadge: {
+    backgroundColor: palette.success + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  levelText: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fonts.semiBold,
+    color: palette.success,
+  },
+  premiumBadge: {
+    backgroundColor: palette.purple + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  premiumText: {
+    fontSize: typography.fontSizes.xs,
+    fontFamily: typography.fonts.semiBold,
+    color: palette.purple,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.light.card,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  statItem: {
     flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: typography.fontSizes.md,
+    fontFamily: typography.fonts.bold,
+    color: colors.light.text,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.light.textSecondary,
+    fontFamily: typography.fonts.regular,
+  },
+  descriptionContainer: {
+    backgroundColor: colors.light.card,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  descriptionLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontFamily: typography.fonts.semiBold,
+    color: colors.light.textSecondary,
+    marginBottom: 8,
+  },
+  descriptionText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.light.text,
+    fontFamily: typography.fonts.regular,
+    lineHeight: 20,
   },
   tabsContainer: {
     backgroundColor: colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
   },
   tabsContent: {
     paddingHorizontal: 16,
   },
   tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -444,12 +495,6 @@ const styles = StyleSheet.create({
   },
   tabContentContainer: {
     flex: 1,
-  },
-  footer: {
-    padding: 16,
-    backgroundColor: colors.light.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.light.border,
   },
 });
 
