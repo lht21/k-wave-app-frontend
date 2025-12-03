@@ -1,7 +1,8 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';
-import AppNavigator from './AppNavigator';
+// --- THAY ĐỔI 1: Import StdNavigator thay vì AppNavigator ---
+import StdNavigator from './StdNavigator'; 
 import TeacherNavigator from './TeacherNavigator';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import SignUpScreen from '../screens/Auth/SignUpScreen';
@@ -64,10 +65,11 @@ const RootNavigator = () => {
           options={{ headerShown: false }}
         />
       ) : (
-        // Đã đăng nhập và là student - điều hướng đến AppNavigator (student)
+        // Đã đăng nhập và là student - điều hướng đến StdNavigator (thay vì AppNavigator cũ)
+        // --- THAY ĐỔI 2: Sử dụng StdNavigator ở đây ---
         <Stack.Screen 
           name="StudentApp" 
-          component={AppNavigator}
+          component={StdNavigator}
           options={{ headerShown: false }}
         />
       )}

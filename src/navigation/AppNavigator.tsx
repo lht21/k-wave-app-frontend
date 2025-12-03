@@ -16,7 +16,7 @@ import NewsScreen from '../screens/News/NewsScreen';
 import LearnImageScreen from '../screens/LearnImage/LearnImageScreen';
 import RoadmapScreen from '../screens/Roadmap/RoadmapScreen';
 import SettingScreen from '../screens/Setting/SettingScreen';
-import HomeScreen from '../screens/Home/HomeScreen';
+import StdHome from '../screens/Home/StdHome';
 import { palette } from '../theme/colors';
 
 const Stack = createStackNavigator();
@@ -52,7 +52,7 @@ const StudentTabs = () => {
         tabBarInactiveTintColor: palette.gray900,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Trang chủ' }} />
+      <Tab.Screen name="Home" component={StdHome} options={{ tabBarLabel: 'Trang chủ' }} />
       <Tab.Screen name="News" component={NewsScreen} options={{ tabBarLabel: 'Tin tức' }} />
       <Tab.Screen name="LearnImage" component={LearnImageScreen} options={{ tabBarLabel: 'Học ảnh' }}/>
       <Tab.Screen name="Roadmap" component={RoadmapScreen} options={{ tabBarLabel: 'Lộ trình' }} />

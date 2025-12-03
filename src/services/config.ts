@@ -3,7 +3,7 @@
 const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
 
 export const API_BASE_URL = isDev 
-  ? 'http://10.0.2.2:5001/api'  // Android emulator (test server port)
+  ? 'http://10.0.2.2:5000/api'  // Android emulator (test server port)
   : 'https://your-production-api.com/api';
 
 // For iOS simulator, use: http://localhost:5000/api

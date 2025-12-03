@@ -16,10 +16,7 @@ import HomeStd from '../screens/Home/StdHome';
 import LearnImageScreen from '../screens/LearnImage/LearnImageScreen';
 import StdNews from '../screens/StdLearn/StdNews';
 import SettingScreen from '../screens/Setting/SettingScreen'; 
-import LoginScreen from '../screens/Auth/LoginScreen';
-import SignUpScreen from '../screens/Auth/SignUpScreen';
-import TeacherSignUpScreen from '../screens/Auth/TeacherSignUpScreen';
-import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
+// --- XÓA CÁC IMPORT AUTH KHÔNG CẦN THIẾT ---
 import StdDashboard from '../screens/Setting/StdDashboard';
 import StdPracticeExam from '../screens/StdLearn/StdPracticeExam';
 import StdRealExam from '../screens/StdLearn/StdRealExam';
@@ -33,6 +30,7 @@ import NewsDetail from '../screens/StdNewsDetail';
 import StdVideoLearning from '../screens/StdLearn/StdVideoLearning';
 import VideoCategory from '../screens/StdLearn/VideoCategory';
 import VideoDetail from '../screens/StdLearn/VideoDetail';
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const SettingStack = createStackNavigator();
@@ -77,49 +75,30 @@ const MainTabs = () => {
         tabBarInactiveTintColor: palette.gray900,
       })}
     >
-      <Tab.Screen name="Roadmap" component={StdRoadmap} options={{ tabBarLabel: 'Lộ trình' }} />
-      <Tab.Screen name="LearnImage" component={StdRealExam} options={{ tabBarLabel: 'Luyện thi' }} />
       <Tab.Screen name="Home" component={HomeStd} options={{ tabBarLabel: 'Trang chủ' }} />
+      <Tab.Screen name="Roadmap" component={StdRoadmap} options={{ tabBarLabel: 'Lộ trình' }} />
+      {/* SỬA LẠI: Dùng đúng component LearnImageScreen hoặc đổi tên route nếu muốn làm Exam */}
+      <Tab.Screen name="LearnImage" component={LearnImageScreen} options={{ tabBarLabel: 'Học ảnh' }} />
       <Tab.Screen name="News" component={StdNews} options={{ tabBarLabel: 'Tin tức' }} />
       <Tab.Screen name="Setting" component={SettingStackNavigator} options={{ tabBarLabel: 'Cá nhân' }} />
     </Tab.Navigator>
   );
 };
 
-// Stack Navigator chính
-const StdAppNavigator = () => {
+// Stack Navigator chính dành cho Student
+const StdNavigator = () => {
    return (
-    <Stack.Navigator initialRouteName="Login">
-      <Stack.Screen 
-        name="Login" 
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-
-      <Stack.Screen 
-        name="SignUp" 
-        component={SignUpScreen}
-        options={{ headerShown: false }}
-      />
-
+    // QUAN TRỌNG: initialRouteName là Main (vào thẳng app), không phải Login
+    <Stack.Navigator initialRouteName="Main">
+      
+      {/* Màn hình chính chứa Tabs */}
       <Stack.Screen 
         name="Main" 
         component={MainTabs}
         options={{ headerShown: false }}
       />
 
-      {/* Auth screens */}
-      <Stack.Screen 
-        name="TeacherSignUp" 
-        component={TeacherSignUpScreen}
-        options={{ headerShown: false }}
-      />
-
-      <Stack.Screen 
-        name="ForgotPassword" 
-        component={ForgotPasswordScreen}
-        options={{ headerShown: false }}
-      />
+      {/* --- CÁC MÀN HÌNH CHI TIẾT (Nằm ngoài Tab bar để che lấp Tab khi navigate) --- */}
 
       {/* Learning screens */}
       <Stack.Screen 
@@ -200,4 +179,4 @@ const StdAppNavigator = () => {
   );
 };
 
-export default StdAppNavigator;
+export default StdNavigator;
