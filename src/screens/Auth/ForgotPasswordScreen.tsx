@@ -9,6 +9,7 @@ import { SecurityIcon, ViewOffIcon, EyeIcon } from '@hugeicons/core-free-icons';
 import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { authService } from '../../services/authService';
 
 type RootStackParamList = {
   Login: undefined;
@@ -47,18 +48,16 @@ const ForgotPasswordScreen = () => {
 
   const newPassword = watch('newPassword');
 
-  // Giả lập các hàm từ useAuth
   const handleForgotPassword = async (data: ForgotPasswordFormData) => {
     setLoading(true);
     setMessage(null);
     
     try {
-      // Giả lập gọi API forgot password
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await authService.forgotPassword(data.email);
       
       setEmailReset(data.email);
       setEnterOTP(true);
-      setMessage('Mã xác nhận đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.');
+      setMessage(result.msg || 'Mã xác nhận đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.');
       
     } catch (error: any) {
       setMessage(error.message || 'Đã xảy ra lỗi khi gửi yêu cầu');
@@ -72,10 +71,12 @@ const ForgotPasswordScreen = () => {
     setMessage(null);
     
     try {
-      // Giả lập gọi API reset password
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await authService.resetPassword({
+        otp: data.otp,
+        newPassword: data.newPassword
+      });
       
-      setMessage('Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
+      setMessage(result.msg || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
       
       // Tự động chuyển đến login sau 2 giây
       setTimeout(() => {
@@ -90,14 +91,18 @@ const ForgotPasswordScreen = () => {
   };
 
   const handleResendOtp = async () => {
+    if (!emailReset) {
+      setMessage('Vui lòng nhập email trước');
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     
     try {
-      // Giả lập gọi API resend OTP
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await authService.resendOtp(emailReset);
       
-      setMessage('Mã xác nhận mới đã được gửi đến email của bạn.');
+      setMessage(result.msg || 'Mã xác nhận mới đã được gửi đến email của bạn.');
       
     } catch (error: any) {
       setMessage(error.message || 'Đã xảy ra lỗi khi gửi lại mã');

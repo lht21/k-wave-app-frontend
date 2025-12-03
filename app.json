@@ -43,6 +43,7 @@
           "cameraPermission": "Ứng dụng cần quyền sử dụng camera để chụp ảnh đại diện."
         }
       ]
+      "expo-audio"
     ]
   }
 }

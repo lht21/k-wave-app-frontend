@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { useState, useEffect } from 'react';
-import { View, ScrollView, Alert, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+// screens/Setting/SettingScreen.tsx
+import React, { useCallback } from 'react'; // Thêm useCallback
+import { View, ScrollView, Alert, TouchableOpacity, Text, StyleSheet, Image } from 'react-native'; // Thêm Image
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Thêm useFocusEffect
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
@@ -20,48 +20,31 @@ import Button from '../../components/Button/Button';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { useAuth } from '../../hooks/useAuth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Cập nhật RootStackParamList
 type RootStackParamList = {
-  Login: undefined;
+  Auth: undefined;
+  TeacherApp: undefined;
+  StudentApp: undefined;
   Setting: undefined;
   Home: undefined;
   Profile: undefined;
 };
+type TeacherStackParamList = {
+  TeacherProfile: undefined;
+};
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  fullName: string;
-  role: string;
-}
+type NavigationProp = StackNavigationProp<any>;
 
 const SettingScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { logout } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      // Lấy thông tin user từ AsyncStorage hoặc từ context
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { user, logout, isLoading, refreshUser } = useAuth(); 
+  // Tự động reload thông tin khi quay lại màn hình này
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -73,7 +56,13 @@ const SettingScreen = () => {
           text: 'Đăng xuất', 
           onPress: async () => {
             await logout();
-            navigation.navigate('Login');
+            // SỬA: Reset về Root Navigator với screen Auth
+            const rootNav = navigation.getParent()?.getParent()?.getParent();
+
+            rootNav?.reset({
+              index: 0,
+              routes: [{ name: 'Auth' }],
+            });
           }
         },
       ]
@@ -84,12 +73,24 @@ const SettingScreen = () => {
     return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
   };
 
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'teacher':
+        return 'Giáo viên';
+      case 'student':
+        return 'Học viên';
+      default:
+        return 'Người dùng';
+    }
+  };
+
+  // Cập nhật các items - xóa navigation không tồn tại
   const accountItems = [
     { 
       title: 'Thông tin cá nhân', 
       icon: UserIcon,
       description: 'Quản lý thông tin tài khoản',
-      onPress: () => navigation.navigate('Profile')
+      onPress: () => navigation.navigate('TeacherProfile') 
     },
     { 
       title: 'Thông báo', 
@@ -141,7 +142,7 @@ const SettingScreen = () => {
     },
   ];
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <Text>Đang tải...</Text>
@@ -159,19 +160,20 @@ const SettingScreen = () => {
       {/* User Info Card */}
       <View style={styles.userCard}>
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {getInitials(user?.fullName || 'Người dùng')}
-            </Text>
+          {/* Sửa lại logic hiển thị Avatar */}
+          {user?.avatar && user.avatar !== 'default-avatar-url' ? (
+             <Image 
+                source={{ uri: user.avatar }} 
+                style={styles.avatarImage} // Nhớ thêm style này bên dưới
+             />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {getInitials(user?.fullName || 'Người dùng')}
+              </Text>
+            </View>
+          )}
           </View>
-          <View style={styles.verifiedBadge}>
-            <HugeiconsIcon 
-              icon={SecurityWifiIcon} 
-              size={12} 
-              color={palette.white}
-            />
-          </View>
-        </View>
         
         <View style={styles.userInfo}>
           <Text style={styles.userName}>
@@ -182,11 +184,12 @@ const SettingScreen = () => {
           </Text>
           <View style={styles.roleBadge}>
             <Text style={styles.roleText}>
-              {user?.role === 'teacher' ? 'Giáo viên' : 'Học viên'}
+              {user ? getRoleDisplayName(user.role) : 'Người dùng'}
             </Text>
           </View>
         </View>
       </View>
+
 
       {/* Tài khoản */}
       <View style={styles.section}>
@@ -326,6 +329,7 @@ const SettingScreen = () => {
   );
 };
 
+// Styles giữ nguyên
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -371,10 +375,19 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: `linear-gradient(135deg, ${colors.light.primary}, ${palette.primary}99)`,
+    backgroundColor: colors.light.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
+    avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.light.gray100, // Màu nền giữ chỗ
+    borderWidth: 1,
+    borderColor: colors.light.gray100,
+  },
+
   avatarText: {
     fontFamily: typography.fonts.bold,
     fontSize: 20,
@@ -481,9 +494,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 8,
     marginBottom: 32,
-  },
-  logoutButton: {
-    marginBottom: 20,
   },
   versionContainer: {
     alignItems: 'center',

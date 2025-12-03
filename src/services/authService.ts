@@ -1,4 +1,4 @@
-import API_BASE_URL, { getAuthHeaders, getWorkingEndpoint } from '../api/api';
+import { API_BASE_URL } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Dynamic AUTH_URL based on working endpoint
@@ -27,11 +27,57 @@ interface RegisterCredentials {
   role?: string;
 }
 
+// THÊM INTERFACE USER
+interface User {
+  _id: string;
+  username: string;
+  email: string;
+  fullName: string;
+  role: string;
+}
+
 interface AuthResponse {
   token?: string;
   user?: any;
   msg?: string;
 }
+
+// ✅ THÊM: Hàm lấy headers với authentication
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  try {
+    const token = await AsyncStorage.getItem('authToken');
+    
+    if (token) {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+    }
+    
+    return {
+      'Content-Type': 'application/json',
+    };
+  } catch (error) {
+    console.error('Error getting auth headers:', error);
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+};
+
+// ✅ THÊM: Hàm lấy user data từ AsyncStorage
+export const getUserData = async (): Promise<User | null> => {
+  try {
+    const userData = await AsyncStorage.getItem('userData');
+    if (userData) {
+      return JSON.parse(userData);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user data:', error);
+    return null;
+  }
+};
 
 export const authService = {
   // Đăng ký
@@ -44,7 +90,9 @@ export const authService = {
 
       const response = await fetch(`${AUTH_URL}/register`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(credentials)
       });
 
@@ -93,13 +141,17 @@ export const authService = {
         throw new Error(result.msg || 'Đăng nhập thất bại');
       }
 
-      const { token } = result;
+      const { token, user } = result;
 
-      if (token) {
-        return result;
+      if (token && user) {
+        console.log('🔑 Login response user data:', user);
+        
+        await AsyncStorage.setItem('authToken', token);
+        await AsyncStorage.setItem('userData', JSON.stringify(user));
+        return { token, user };
       } else {
-        console.log('Không tìm thấy token', result);
-        throw new Error('Không tìm thấy token trong phản hồi đăng nhập.');
+        console.log('Không tìm thấy token hoặc user data', result);
+        throw new Error('Thiếu thông tin người dùng trong phản hồi đăng nhập.');
       }
     } catch (error) {
       console.error('❌ Login error:', error);
@@ -120,18 +172,9 @@ export const authService = {
   logout: async () => {
     try {
       await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userData'); 
     } catch (error) {
       console.error('Error during logout:', error);
-    }
-  },
-
-  // Lấy token
-  getToken: async (): Promise<string | null> => {
-    try {
-      return await AsyncStorage.getItem('authToken');
-    } catch (error) {
-      console.error('Error getting token:', error);
-      return null;
     }
   },
 
@@ -147,46 +190,58 @@ export const authService = {
   },
 
   // Quên mật khẩu
-forgotPassword: async (email: string): Promise<any> => {
-  try {
-    const response = await fetch(`${AUTH_URL}/forgot-password`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ email })
-    });
+  forgotPassword: async (email: string): Promise<any> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${AUTH_URL}/forgot-password`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email })
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
-      throw new Error(result.msg || 'Gửi yêu cầu thất bại');
+      if (!response.ok) {
+        throw new Error(result.msg || 'Gửi yêu cầu thất bại');
+      }
+
+      return result;
+    } catch (error) {
+      throw error;
     }
+  },
 
-    return result;
-  } catch (error) {
-    throw error;
-  }
-},
+  // Reset mật khẩu
+  resetPassword: async (resetData: { otp: string; newPassword: string }): Promise<any> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${AUTH_URL}/reset-password`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(resetData)
+      });
 
-// Reset mật khẩu
-resetPassword: async (resetData: { otp: string; newPassword: string }): Promise<any> => {
-  try {
-    const response = await fetch(`${AUTH_URL}/reset-password`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(resetData)
-    });
+      const result = await response.json();
 
-    const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.msg || 'Đặt lại mật khẩu thất bại');
+      }
 
-    if (!response.ok) {
-      throw new Error(result.msg || 'Đặt lại mật khẩu thất bại');
+      return result;
+    } catch (error) {
+      throw error;
     }
+  },
 
-    return result;
-  } catch (error) {
-    throw error;
-  }
-},
+  // Gửi lại OTP
+  resendOtp: async (email: string): Promise<any> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${AUTH_URL}/resend-password-otp`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email })
+      });
 
   // Gửi lại OTP
   resendOtp: async (email: string): Promise<any> => {

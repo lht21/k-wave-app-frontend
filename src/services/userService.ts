@@ -93,3 +93,146 @@ export const userService = {
     }
   }
 };
+// services/userService.ts
+import API_BASE_URL from '../api/api';
+import { authService } from './authService';
+
+export interface UserProfile {
+  _id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  role: string;
+  level: string;
+  avatar: string;
+  topikAchievement: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateProfileData {
+  fullName?: string;
+  level?: string;
+  topikAchievement?: number | null;
+}
+
+export interface AvatarResponse {
+  avatar: string;
+  message?: string;
+}
+
+export interface UserProfileResponse {
+  message?: string;
+  user?: UserProfile;
+}
+
+class UserService {
+  private async fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
+    try {
+      const token = await authService.getToken();
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      };
+
+      console.log('🌐 [UserService] Making request to:', url);
+      console.log('🌐 [UserService] Method:', options.method || 'GET');
+
+      const response = await fetch(url, { ...options, headers });
+      
+      const responseText = await response.text();
+      console.log('🌐 [UserService] Response status:', response.status);
+      console.log('🌐 [UserService] Response:', responseText.substring(0, 200));
+
+      if (!response.ok) {
+        let errorMessage = 'Request failed';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorData.msg || errorMessage;
+        } catch (e) {
+          // Nếu không parse được JSON, dùng text
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Parse JSON response
+      return JSON.parse(responseText) as T;
+    } catch (error) {
+      console.error('[UserService] Request error:', error);
+      throw error;
+    }
+  }
+
+  // GET: Lấy thông tin profile
+  async getProfile(): Promise<UserProfile> {
+    return this.fetchWithAuth<UserProfile>(`${API_BASE_URL}/user/profile`);
+  }
+
+  // PATCH: Cập nhật thông tin profile
+  async updateUserProfile(userData: UpdateProfileData): Promise<UserProfileResponse> {
+    return this.fetchWithAuth<UserProfileResponse>(`${API_BASE_URL}/user/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  // POST: Upload avatar (xử lý FormData)
+  async uploadAvatar(imageUri: string): Promise<AvatarResponse> {
+    try {
+      const token = await authService.getToken();
+      
+      // Tạo FormData
+      const formData = new FormData();
+      
+      // Lấy đuôi file (jpg, png)
+      const uriParts = imageUri.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+      
+      // Tạo file object cho React Native
+      const file = {
+        uri: imageUri,
+        name: `avatar.${fileType}`,
+        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+      } as any;
+      
+      formData.append('avatar', file);
+      
+      console.log('📁 [UserService] Uploading avatar...');
+      
+      const response = await fetch(`${API_BASE_URL}/user/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Note: KHÔNG đặt 'Content-Type' header khi dùng FormData
+          // React Native sẽ tự động set đúng boundary
+        },
+        body: formData,
+      });
+      
+      const responseText = await response.text();
+      console.log('🌐 [UserService] Upload response status:', response.status);
+      console.log('🌐 [UserService] Upload response:', responseText);
+      
+      if (!response.ok) {
+        let errorMessage = 'Upload failed';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorData.msg || errorMessage;
+        } catch (e) {
+          errorMessage = responseText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      return JSON.parse(responseText) as AvatarResponse;
+    } catch (error) {
+      console.error('[UserService] Upload error:', error);
+      throw error;
+    }
+  }
+}
+
+export const userService = new UserService();
