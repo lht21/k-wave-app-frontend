@@ -102,7 +102,7 @@ const HomeStd: React.FC = () => {
             <Text style={styles.premiumSubtitle}>Seoul trong tầm tay</Text>
           </View>
           
-          <TouchableOpacity style={styles.premiumBtn}>
+          <TouchableOpacity style={styles.premiumBtn} onPress={() => router.push('/(student)/premium/update')}>
             <Text style={styles.premiumBtnText}>Đăng ký ngay!</Text>
           </TouchableOpacity>
           
