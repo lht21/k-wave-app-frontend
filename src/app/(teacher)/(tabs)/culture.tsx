@@ -41,7 +41,7 @@ import ModalCulture from '../../../components/Modal/ModalCulture';
 import Button from '../../../components/Button/Button';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-import TeacherCultureDetail from './TeacherCultureDetail';
+
 
 // Định nghĩa Type cho Navigation
 type TeacherStackParamList = {

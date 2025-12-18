@@ -30,7 +30,7 @@ type TeacherStackParamList = {
   TeacherMain: undefined;
   LessonDetail: { lessonId: number };
   ExamDetail: { examId: string };
-  CultureDetail: { cultureId: string };
+  TeacherCultureDetail: { cultureId: string };
   TeacherProfile: undefined; 
 };
 
@@ -135,7 +135,7 @@ const TeacherNavigator = () => {
         }}
       />
       <Stack.Screen 
-        name="CultureDetail" 
+        name="TeacherCultureDetail" 
         component={TeacherCultureDetail}
         options={{ 
           title: 'Chi tiết văn hóa',

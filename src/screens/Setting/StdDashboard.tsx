@@ -1,8 +1,10 @@
 import React from 'react'
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { spacing } from '../../theme/spacing'
 import { colors } from '../../theme/colors'
+import { useAuth } from '../../hooks/useAuth'
+
 import { typography } from '../../theme/typography'
 
 // Vertical pill used for weekly progress (vertical bar with fill based on percentage)
@@ -35,12 +37,41 @@ const HorizontalBar: React.FC<{ percent: number }> = ({ percent = 0 }) => {
 }
 
 const DashboardStd: React.FC = () => {
+  const { logout, user } = useAuth()
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = React.useState('progress')
 
   const handleTabPress = (tabName: string) => {
     setActiveTab(tabName)
   }
+
+  // <--- Hàm xử lý đăng xuất
+  const handleLogout = () => {
+    Alert.alert(
+      "Đăng xuất",
+      "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel"
+        },
+        {
+          text: "Đăng xuất",
+          style: "destructive", // Hiển thị màu đỏ trên iOS để cảnh báo
+          onPress: async () => {
+            try {
+              await logout();
+              // Lưu ý: Thông thường RootNavigator sẽ tự động điều hướng về màn hình Login 
+              // khi user trong AuthContext trở thành null.
+            } catch (error) {
+              console.error("Lỗi khi đăng xuất:", error);
+              Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const renderProgressContent = () => (
     <>
@@ -243,8 +274,8 @@ const DashboardStd: React.FC = () => {
           <Text style={styles.settingText}>Điều khoản sử dụng</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
-          <Text style={styles.settingText}>Đăng xuất</Text>
+        <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
+          <Text style={[styles.settingText, { color: colors.light.error || 'red' }]}>Đăng xuất</Text>
           <Text style={styles.settingArrow}>›</Text>
         </TouchableOpacity>
       </View>
@@ -284,10 +315,14 @@ const DashboardStd: React.FC = () => {
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Image source={{ uri: 'https://dimensions.edu.vn/upload/2025/01/avt-doi-meme-006.webp' }} style={styles.avatar} />
+        <Image 
+          source={{ uri: user?.avatar || 'https://dimensions.edu.vn/upload/2025/01/avt-doi-meme-006.webp' }} 
+          style={styles.avatar} 
+        />
         <View style={{ marginLeft: spacing.md }}>
-          <Text style={styles.name}>Nguyễn Thị A</Text>
-          <Text style={styles.sub}>470 exp</Text>
+          {/* Hiển thị tên thật */}
+          <Text style={styles.name}>{user?.fullName || 'Người dùng'}</Text>
+          <Text style={styles.sub}>470 exp</Text> 
         </View>
       </View>
 
