@@ -78,7 +78,7 @@ const MainTabs = () => {
       <Tab.Screen name="Home" component={HomeStd} options={{ tabBarLabel: 'Trang chủ' }} />
       <Tab.Screen name="Roadmap" component={StdRoadmap} options={{ tabBarLabel: 'Lộ trình' }} />
       {/* SỬA LẠI: Dùng đúng component LearnImageScreen hoặc đổi tên route nếu muốn làm Exam */}
-      <Tab.Screen name="LearnImage" component={LearnImageScreen} options={{ tabBarLabel: 'Học ảnh' }} />
+      {/* <Tab.Screen name="LearnImage" component={LearnImageScreen} options={{ tabBarLabel: 'Học ảnh' }} /> */}
       <Tab.Screen name="News" component={StdNews} options={{ tabBarLabel: 'Tin tức' }} />
       <Tab.Screen name="Setting" component={SettingStackNavigator} options={{ tabBarLabel: 'Cá nhân' }} />
     </Tab.Navigator>

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native'
 import { spacing } from '../../theme/spacing'
 import { colors, palette } from '../../theme/colors'
 import { typography } from '../../theme/typography'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const HomeStd: React.FC = () => {
   const navigation = useNavigation<any>()
@@ -85,132 +86,134 @@ const HomeStd: React.FC = () => {
   )
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
-      {/* Header - Welcome Section */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👋</Text>
+    <SafeAreaView>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
+        {/* Header - Welcome Section */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>👋</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>Xin chào</Text>
+              <Text style={styles.greetingSubtitle}>Mỗi ngày một bước, chinh phục tiếng Hàn dễ dàng!</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Xin chào</Text>
-            <Text style={styles.greetingSubtitle}>Mỗi ngày một bước, chinh phục tiếng Hàn dễ dàng!</Text>
-          </View>
+          <TouchableOpacity style={styles.signUpBtn}>
+            <Text style={styles.signUpText}>Đăng ký ngay!</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.signUpBtn}>
-          <Text style={styles.signUpText}>Đăng ký ngay!</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Learning Modules */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Học tập:</Text>
-        <View style={styles.modulesGrid}>
-          {learningModules.map((module) => (
-            <LearningModule key={module.id} item={module} />
-          ))}
-        </View>
-      </View>
-
-      {/* Daily Challenge / Featured Content */}
-      <ImageBackground
-        source={{ uri: 'https://i.pinimg.com/736x/ce/4c/ff/ce4cff826575cd2add5099f1c2e3c9ad.jpg' }}
-        style={styles.dailyChallengeCard}
-        imageStyle={styles.backgroundImage}
-      >
-        <View style={styles.challengeOverlay}>
-          <Text style={styles.challengeTag}>Ưu đãi</Text>
-          
-          <Text style={styles.challengeTitle}>{dailyChallenge.title}</Text>
-        <Text style={styles.challengeSubtitle}>{dailyChallenge.subtitle}</Text>
-        <Text style={styles.challengeHint}>{dailyChallenge.hint}</Text>
-
-        {/* Counter */}
-        <View style={styles.counterContainer}>
-          {dailyChallenge.participants
-            .toString()
-            .split('')
-            .map((digit, idx) => (
-              <View key={idx} style={styles.counterDigit}>
-                <Text style={styles.digitText}>{digit}</Text>
-              </View>
+        {/* Learning Modules */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Học tập:</Text>
+          <View style={styles.modulesGrid}>
+            {learningModules.map((module) => (
+              <LearningModule key={module.id} item={module} />
             ))}
-        </View>
-
-        <View style={styles.challengeInfo}>
-          <View style={styles.infoRow}>
-            <Image
-              source={{ uri: 'https://placehold.co/50x50' }}
-              style={styles.infoAvatar}
-            />
-            <Text style={styles.infoText}>{dailyChallenge.description}</Text>
           </View>
         </View>
 
-        {/* Flags and features */}
-        <View style={styles.flagsSection}>
-          <View style={styles.flagRowCenter}>
-            <Text style={styles.flag}>🇻🇳</Text>
-            <Text style={styles.flag}>🇰🇷</Text>
+        {/* Daily Challenge / Featured Content */}
+        <ImageBackground
+          source={{ uri: 'https://i.pinimg.com/736x/ce/4c/ff/ce4cff826575cd2add5099f1c2e3c9ad.jpg' }}
+          style={styles.dailyChallengeCard}
+          imageStyle={styles.backgroundImage}
+        >
+          <View style={styles.challengeOverlay}>
+            <Text style={styles.challengeTag}>Ưu đãi</Text>
+            
+            <Text style={styles.challengeTitle}>{dailyChallenge.title}</Text>
+          <Text style={styles.challengeSubtitle}>{dailyChallenge.subtitle}</Text>
+          <Text style={styles.challengeHint}>{dailyChallenge.hint}</Text>
+
+          {/* Counter */}
+          <View style={styles.counterContainer}>
+            {dailyChallenge.participants
+              .toString()
+              .split('')
+              .map((digit, idx) => (
+                <View key={idx} style={styles.counterDigit}>
+                  <Text style={styles.digitText}>{digit}</Text>
+                </View>
+              ))}
           </View>
-          <View style={styles.flagRow}>
-            <View style={styles.checkmarkContainer}>
-              <Text style={styles.checkmark}>✅</Text>
+
+          <View style={styles.challengeInfo}>
+            <View style={styles.infoRow}>
+              <Image
+                source={{ uri: 'https://placehold.co/50x50' }}
+                style={styles.infoAvatar}
+              />
+              <Text style={styles.infoText}>{dailyChallenge.description}</Text>
             </View>
-            <Text style={styles.flagLabel}>Tiết kiệm chi phí – chỉ bằng 1/5 so với học tại trung tâm.</Text>
           </View>
-          <View style={styles.flagRow}>
-            <View style={styles.checkmarkContainer}>
-              <Text style={styles.checkmark}>✅</Text>
+
+          {/* Flags and features */}
+          <View style={styles.flagsSection}>
+            <View style={styles.flagRowCenter}>
+              <Text style={styles.flag}>🇻🇳</Text>
+              <Text style={styles.flag}>🇰🇷</Text>
             </View>
-            <Text style={styles.flagLabel}>Học mọi lúc, mọi nơi – chỉ cần điện thoại, không lo lệch lịch.</Text>
-          </View>
-          <View style={styles.flagRow}>
-            <View style={styles.checkmarkContainer}>
-              <Text style={styles.checkmark}>✅</Text>
+            <View style={styles.flagRow}>
+              <View style={styles.checkmarkContainer}>
+                <Text style={styles.checkmark}>✅</Text>
+              </View>
+              <Text style={styles.flagLabel}>Tiết kiệm chi phí – chỉ bằng 1/5 so với học tại trung tâm.</Text>
             </View>
-            <Text style={styles.flagLabel}>Tiến bộ nhanh – lộ trình cá nhân hóa, phù hợp từng trình độ.</Text>
-          </View>
-          <View style={styles.flagRow}>
-            <View style={styles.checkmarkContainer}>
-              <Text style={styles.checkmark}>✅</Text>
+            <View style={styles.flagRow}>
+              <View style={styles.checkmarkContainer}>
+                <Text style={styles.checkmark}>✅</Text>
+              </View>
+              <Text style={styles.flagLabel}>Học mọi lúc, mọi nơi – chỉ cần điện thoại, không lo lệch lịch.</Text>
             </View>
-            <Text style={styles.flagLabel}>Phát âm chuẩn bản xứ – luyện với công nghệ Al nhận diện giọng nói.</Text>
-          </View>
-          <View style={styles.flagRow}>
-            <View style={styles.checkmarkContainer}>
-              <Text style={styles.checkmark}>✅</Text>
+            <View style={styles.flagRow}>
+              <View style={styles.checkmarkContainer}>
+                <Text style={styles.checkmark}>✅</Text>
+              </View>
+              <Text style={styles.flagLabel}>Tiến bộ nhanh – lộ trình cá nhân hóa, phù hợp từng trình độ.</Text>
             </View>
-            <Text style={styles.flagLabel}>Đầy đủ kỹ năng – nghe, nói, đọc, viết từ sơ cấp đến ΤΟΡΙΚ 6.</Text>
+            <View style={styles.flagRow}>
+              <View style={styles.checkmarkContainer}>
+                <Text style={styles.checkmark}>✅</Text>
+              </View>
+              <Text style={styles.flagLabel}>Phát âm chuẩn bản xứ – luyện với công nghệ Al nhận diện giọng nói.</Text>
+            </View>
+            <View style={styles.flagRow}>
+              <View style={styles.checkmarkContainer}>
+                <Text style={styles.checkmark}>✅</Text>
+              </View>
+              <Text style={styles.flagLabel}>Đầy đủ kỹ năng – nghe, nói, đọc, viết từ sơ cấp đến ΤΟΡΙΚ 6.</Text>
+            </View>
           </View>
+
+            <TouchableOpacity style={styles.upgradeBtn}>
+              <Text style={styles.upgradeBtnText}>Nâng cấp gói</Text>
+            </TouchableOpacity>
+          </View>
+        </ImageBackground>
+
+        {/* Korean Culture Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Văn hóa Hàn Quốc</Text>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('StdCulture')}>
+              <Text style={styles.seeAll}>Xem thêm</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={cultureCategories}
+            renderItem={({ item }) => <CultureItem item={item} />}
+            keyExtractor={(item) => item.id}
+            numColumns={1}
+            scrollEnabled={false}
+          />
         </View>
 
-          <TouchableOpacity style={styles.upgradeBtn}>
-            <Text style={styles.upgradeBtnText}>Nâng cấp gói</Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
-
-      {/* Korean Culture Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Văn hóa Hàn Quốc</Text>
-          <TouchableOpacity onPress={() => (navigation as any).navigate('StdCulture')}>
-            <Text style={styles.seeAll}>Xem thêm</Text>
-          </TouchableOpacity>
-        </View>
-        <FlatList
-          data={cultureCategories}
-          renderItem={({ item }) => <CultureItem item={item} />}
-          keyExtractor={(item) => item.id}
-          numColumns={1}
-          scrollEnabled={false}
-        />
-      </View>
-
-      {/* Bottom spacing */}
-      <View style={{ height: spacing.xxl }} />
-    </ScrollView>
+        {/* Bottom spacing */}
+        <View style={{ height: spacing.xxl }} />
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
