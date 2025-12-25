@@ -8,6 +8,7 @@ import {
   Image, 
   Dimensions 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
@@ -106,7 +107,7 @@ const StdVideoLearning: React.FC = () => {
 
   const handleVideoPress = (video: any) => {
     router.push({
-      pathname: '/(student)/video-detail',
+      pathname: '/(student)/video/[id]',
       params: {
         videoId: video.id,
         videoTitle: video.title
@@ -116,7 +117,7 @@ const StdVideoLearning: React.FC = () => {
 
   const handleSeeMore = (categoryId: string, categoryTitle: string) => {
     router.push({
-      pathname: '/(student)/video-category',
+      pathname: '/(student)/video/index',
       params: {
         categoryId,
         categoryTitle
@@ -177,18 +178,22 @@ const StdVideoLearning: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Học qua Video</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Text style={styles.searchButtonText}>🔍</Text>
-        </TouchableOpacity>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Học qua Video</Text>
+            <TouchableOpacity style={styles.searchButton}>
+              <Text style={styles.searchButtonText}>🔍</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
 
       {/* Premium Banner */}
@@ -249,20 +254,21 @@ export default StdVideoLearning;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#fff'
   },
 
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
-    backgroundColor: '#269a56ff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20
+    marginTop: 10,
   },
   backButton: {
     width: 40,
@@ -273,14 +279,16 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   backButtonText: {
-    fontSize: 20,
-    color: palette.white,
-    fontWeight: '600'
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold'
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: '700',
-    color: palette.white
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   searchButton: {
     width: 40,
@@ -292,7 +300,7 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     fontSize: 16,
-    color: palette.white
+    color: '#fff'
   },
 
   // Premium Banner

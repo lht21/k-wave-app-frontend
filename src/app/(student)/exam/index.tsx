@@ -19,6 +19,9 @@ import { mockExamSets, mockQuestions } from '../../../data/mockExamData';
 import { Question, ExamSession, ExamResult } from '../../../types/exam';
 import { formatTime } from '../../../utils/examUtils';
 import QuestionGridModal from '../../../components/QuestionGridModal';
+import WordPopup from '../../../components/WordPopup';
+import ClickableText from '../../../components/ClickableText';
+import { useWordPopup } from '../../../hooks/useWordPopup';
 
 type StdExamTakingNavigationProp = StackNavigationProp<RootStackParamList>;
 type StdExamTakingRouteProp = RouteProp<RootStackParamList, 'StdExamTaking'>;
@@ -40,6 +43,9 @@ const StdExamTaking: React.FC = () => {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showQuestionGrid, setShowQuestionGrid] = useState(false);
+  
+  // Word popup functionality
+  const { wordInfo, popupVisible, popupPosition, handleWordPress, closePopup } = useWordPopup();
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTime = useRef(Date.now());
@@ -231,7 +237,11 @@ const StdExamTaking: React.FC = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.questionContainer}>
           <Text style={styles.questionNumber}>Câu {currentQuestionIndex + 1}</Text>
-          <Text style={styles.questionText}>{currentQuestion.question}</Text>
+          <ClickableText 
+            text={currentQuestion.question}
+            onWordPress={handleWordPress}
+            style={styles.questionText}
+          />
           
           {/* Answer Options */}
           <View style={styles.optionsContainer}>
@@ -251,9 +261,11 @@ const StdExamTaking: React.FC = () => {
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
-                      {option}
-                    </Text>
+                    <ClickableText 
+                      text={option}
+                      onWordPress={handleWordPress}
+                      style={[styles.optionText, isSelected && styles.selectedOptionText]}
+                    />
                   </View>
                 </TouchableOpacity>
               );
@@ -341,6 +353,14 @@ const StdExamTaking: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Word Popup */}
+      <WordPopup
+        visible={popupVisible}
+        onClose={closePopup}
+        wordInfo={wordInfo}
+        position={popupPosition}
+      />
 
       {/* Question Grid Modal */}
       <QuestionGridModal

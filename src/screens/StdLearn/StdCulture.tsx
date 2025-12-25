@@ -5,18 +5,15 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  SafeAreaView,
   FlatList,
-  Image,
   ActivityIndicator,
   Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-import { RootStackParamList } from '../../types/navigation';
 import CultureApiService from '../../services/cultureApiService';
 
 interface CultureCategory {
@@ -43,10 +40,8 @@ interface CultureItem {
   };
 }
 
-type CultureNavigationProp = StackNavigationProp<RootStackParamList>;
-
 const StdCulture: React.FC = () => {
-  const navigation = useNavigation<CultureNavigationProp>();
+  const router = useRouter();
   const [categories, setCategories] = useState<CultureCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<CultureCategory | null>(null);
   const [cultureItems, setCultureItems] = useState<CultureItem[]>([]);
@@ -77,7 +72,7 @@ const StdCulture: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading categories:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách chủ đề');
+      Alert.alert('Lỗi', 'Không thể tải danh sách chủ đề. Vui lòng kiểm tra kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -95,7 +90,7 @@ const StdCulture: React.FC = () => {
       setCultureItems(response.items || []);
     } catch (error) {
       console.error('Error loading culture items:', error);
-      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa');
+      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa. Vui lòng thử lại.');
     } finally {
       setItemsLoading(false);
     }
@@ -106,9 +101,12 @@ const StdCulture: React.FC = () => {
   };
 
   const handleItemPress = (item: CultureItem) => {
-    navigation.navigate('StdCultureDetail' as any, { 
-      itemId: item._id,
-      itemTitle: item.title 
+    router.push({
+      pathname: '/(student)/culture/[id]',
+      params: { 
+        id: item._id,
+        itemTitle: item.title 
+      }
     });
   };
 
@@ -211,7 +209,7 @@ const StdCulture: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>

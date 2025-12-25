@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Platform, Alert, Dimensions, ActivityIndicator, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { spacing } from '../../../theme/spacing'
 import { colors, palette } from '../../../theme/colors'
@@ -327,7 +328,7 @@ const StdNews: React.FC = () => {
     <TouchableOpacity 
       style={styles.newsCard}
       onPress={() => router.push({
-        pathname: '/(student)/news-detail',
+        pathname: '/(student)/news/[id]',
         params: {
           newsId: item.id, 
           title: item.title 
@@ -361,23 +362,27 @@ const StdNews: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* Header */}
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📰 한국 뉴스</Text>
-        <TouchableOpacity 
-          style={styles.viewAllButton}
-          onPress={() => {
-            // Reset all filters to show all articles
-            setSelectedCategory('all')
-            setSelectedSource('all')
-            setSelectedFavorite(false)
-            setShowCategoryDropdown(false)
-            setShowSourceDropdown(false)
-          }}
-        >
-          <Text style={styles.viewAllIcon}>📋</Text>
-          <Text style={styles.viewAllText}>전체보기</Text>
-        </TouchableOpacity>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>📰 한국 뉴스</Text>
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => {
+                // Reset all filters to show all articles
+                setSelectedCategory('all')
+                setSelectedSource('all')
+                setSelectedFavorite(false)
+                setShowCategoryDropdown(false)
+                setShowSourceDropdown(false)
+              }}
+            >
+              <Text style={styles.viewAllIcon}>📋</Text>
+              <Text style={styles.viewAllText}>전체보기</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
 
       {/* Filters */}
@@ -465,25 +470,26 @@ export default StdNews
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.light.background
+    backgroundColor: '#fff'
   },
 
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingTop: 60,
-    backgroundColor: '#269a56ff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    marginTop: 10,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: palette.white,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   viewAllButton: {
     flexDirection: 'row',

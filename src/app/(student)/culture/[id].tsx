@@ -5,94 +5,132 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Image,
   ActivityIndicator,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../../../theme/spacing';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-import { RootStackParamList } from '../../../types/navigation';
-import CultureApiService from '../../../services/cultureApiService';
+import { cultureService, Culture } from '../../../services/cultureService';
 
-interface CultureItem {
+interface CultureItem extends Culture {
   _id: string;
   title: string;
-  subtitle?: string;
-  description: string;
-  content?: string;
-  category: {
-    id: string;
-    title: string;
-    description?: string;
-  };
-  tags?: string[];
-  difficulty?: 'beginner' | 'intermediate' | 'advanced';
-  viewCount: number;
-  author: {
-    fullName: string;
-    email?: string;
-  };
-  createdAt?: string;
-  publishedAt?: string;
-  status?: string;
-  isPublished?: boolean;
+  subtitle: string;
+  category: string;
+  content: any[];
+  vocabulary: any[];
+  views?: number;
+  likes?: number;
+  author?: any;
+  isPremium?: boolean;
+  image: string;
 }
 
-type CultureDetailNavigationProp = StackNavigationProp<RootStackParamList>;
-type CultureDetailRouteProp = RouteProp<any, 'StdCultureDetail'>;
-
 const StdCultureDetail: React.FC = () => {
-  const navigation = useNavigation<CultureDetailNavigationProp>();
-  const route = useRoute<CultureDetailRouteProp>();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   
-  const { itemId } = route.params as { itemId: string; itemTitle: string };
+  const itemId = params.id as string;
   const [item, setItem] = useState<CultureItem | null>(null);
   const [relatedItems, setRelatedItems] = useState<CultureItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentCategory, setCurrentCategory] = useState<string>('');
 
   useEffect(() => {
-    loadCultureItem();
+    if (itemId) {
+      loadCultureItem();
+    }
   }, [itemId]);
 
   const loadCultureItem = async () => {
     try {
       setLoading(true);
-      const itemData = await CultureApiService.getCultureItem(itemId);
+      console.log('🔄 Loading culture item with ID:', itemId);
+      
+      const itemData = await cultureService.getById(itemId);
+      console.log('📊 Item data received:', itemData);
+      
       setItem(itemData);
+      setCurrentCategory(itemData.category);
 
-      // Load related items
-      if (itemData.category.id) {
-        loadRelatedItems(itemData.category.id, itemId);
-      }
+      // Load related items from the same category
+      await loadRelatedItems(itemData.category, itemId);
     } catch (error) {
-      console.error('Error loading culture item:', error);
-      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa');
-      navigation.goBack();
+      console.error('❌ Error loading culture item:', error);
+      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa. Vui lòng kiểm tra kết nối mạng.');
+      router.back();
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRelatedItems = async (categoryId: string, currentItemId: string) => {
+  const loadRelatedItems = async (category: string, currentItemId: string) => {
     try {
-      const response = await CultureApiService.getCultureItems({
-        categoryId,
-        limit: 4
-      });
+      console.log('🔄 Loading related items for category:', category);
+      
+      const response = await cultureService.getAll(category);
       
       // Lọc bỏ item hiện tại
-      const filtered = response.items?.filter((relatedItem: CultureItem) => 
-        relatedItem._id !== currentItemId
-      ).slice(0, 3) || [];
+      const filtered = response
+        .filter((relatedItem: CultureItem) => relatedItem._id !== currentItemId)
+        .slice(0, 3);
       
+      console.log('📊 Related items found:', filtered.length);
       setRelatedItems(filtered);
     } catch (error) {
-      console.error('Error loading related items:', error);
+      console.error('❌ Error loading related items:', error);
+      setRelatedItems([]);
     }
+  };
+
+  const renderContent = () => {
+    if (!item || !item.content) return null;
+
+    return item.content.map((section, index) => {
+      if (section.type === 'text') {
+        return (
+          <View key={index} style={styles.contentSection}>
+            <Text style={styles.contentText}>{section.content}</Text>
+          </View>
+        );
+      } else if (section.type === 'image' && section.url) {
+        return (
+          <View key={index} style={styles.imageSection}>
+            <Image 
+              source={{ uri: section.url }} 
+              style={styles.contentImage}
+              resizeMode="cover"
+            />
+            {section.caption && (
+              <Text style={styles.imageCaption}>{section.caption}</Text>
+            )}
+          </View>
+        );
+      }
+      return null;
+    });
+  };
+
+  const renderVocabulary = () => {
+    if (!item || !item.vocabulary || item.vocabulary.length === 0) return null;
+
+    return (
+      <View style={styles.vocabularySection}>
+        <Text style={styles.sectionTitle}>📚 Từ vựng liên quan</Text>
+        {item.vocabulary.map((vocab, index) => (
+          <View key={index} style={styles.vocabItem}>
+            <Text style={styles.vocabWord}>
+              {vocab.word} <Text style={styles.vocabPronunciation}>[{vocab.pronunciation}]</Text>
+            </Text>
+            <Text style={styles.vocabMeaning}>{vocab.meaning}</Text>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   if (loading) {
@@ -116,9 +154,9 @@ const StdCultureDetail: React.FC = () => {
             <Text style={styles.errorText}>Không tìm thấy nội dung!</Text>
             <TouchableOpacity 
               style={styles.backToListButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => router.back()}
             >
-              <Text style={styles.backToListText}>Quay lại</Text>
+              <Text style={styles.backToListText}>Quay lại danh sách</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -126,129 +164,121 @@ const StdCultureDetail: React.FC = () => {
     );
   }
 
-  const getDetailContent = (item: CultureItem) => {
-    // Nếu có content từ database thì dùng, không thì dùng description
-    const contentText = item.content || item.description;
-    
-    // Format nội dung để hiển thị tốt hơn
-    const formatContent = (text: string) => {
-      // Tách content thành các đoạn dựa trên double line breaks
-      const paragraphs = text.split('\n\n').filter(p => p.trim());
-      
-      return paragraphs.map((paragraph, index) => {
-        // Kiểm tra nếu là tiêu đề (có emoji hoặc 📖, 🎯, 💡, v.v.)
-        const isHeader = /^[📖🎯💡🏮🍽️🎊📚👥🌟⚡]/.test(paragraph.trim());
-        
-        return (
-          <View key={index} style={isHeader ? styles.sectionHeader : styles.paragraph}>
-            <Text style={isHeader ? styles.sectionHeaderText : styles.contentText}>
-              {paragraph.trim()}
-            </Text>
-          </View>
-        );
-      });
-    };
-
-    return (
-      <View style={styles.detailContent}>
-        <View style={styles.contentSection}>
-          {formatContent(contentText)}
-        </View>
-        
-        <View style={styles.metaInfo}>
-          <Text style={styles.metaLabel}>Tác giả: <Text style={styles.metaValue}>{item.author.fullName}</Text></Text>
-          <Text style={styles.metaLabel}>Lượt xem: <Text style={styles.metaValue}>{item.viewCount}</Text></Text>
-          <Text style={styles.metaLabel}>Chủ đề: <Text style={styles.metaValue}>{item.category.title}</Text></Text>
-          {item.publishedAt && (
-            <Text style={styles.metaLabel}>
-              Xuất bản: <Text style={styles.metaValue}>{new Date(item.publishedAt).toLocaleDateString('vi-VN')}</Text>
-            </Text>
-          )}
-        </View>
-        
-        {item.tags && item.tags.length > 0 && (
-          <View style={styles.tagsSection}>
-            <Text style={styles.tagsSectionTitle}>Từ khóa:</Text>
-            <View style={styles.tagsContainer}>
-              {item.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  // relatedItems đã được khai báo ở state
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{item.title}</Text>
-        <TouchableOpacity style={styles.shareButton}>
-          <Text style={styles.shareButtonText}>📤</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>{item.title}</Text>
-          {item.subtitle && (
-            <Text style={styles.subtitle}>{item.subtitle}</Text>
-          )}
-          <Text style={styles.description}>{item.description}</Text>
-          
-          {item.difficulty && (
-            <View style={styles.difficultyBadge}>
-              <Text style={styles.difficultyText}>
-                Mức độ: {item.difficulty === 'beginner' ? 'Cơ bản' :
-                        item.difficulty === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
-              </Text>
-            </View>
-          )}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{item.title}</Text>
+          <TouchableOpacity 
+            style={styles.shareButton}
+            onPress={() => Alert.alert('Chia sẻ', 'Tính năng chia sẻ đang phát triển')}
+          >
+            <Text style={styles.shareButtonText}>📤</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Content */}
-        {getDetailContent(item)}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Hero Image */}
+          {item.image && (
+            <View style={styles.heroImageContainer}>
+              <Image 
+                source={{ uri: item.image }} 
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+              {item.isPremium && (
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
+                </View>
+              )}
+            </View>
+          )}
 
-        {/* Related Items */}
-        {relatedItems.length > 0 && (
-          <View style={styles.relatedSection}>
-            <Text style={styles.relatedTitle}>Nội dung liên quan</Text>
-            {relatedItems.map((relatedItem) => (
-              <TouchableOpacity
-                key={relatedItem._id}
-                style={styles.relatedItem}
-                onPress={() => navigation.push('StdCultureDetail' as any, { 
-                  itemId: relatedItem._id,
-                  itemTitle: relatedItem.title 
-                })}
-              >
-                <Text style={styles.relatedItemTitle}>{relatedItem.title}</Text>
-                <Text style={styles.relatedItemDescription} numberOfLines={1}>
-                  {relatedItem.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>{item.title}</Text>
+            {item.subtitle && (
+              <Text style={styles.subtitle}>{item.subtitle}</Text>
+            )}
+            
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{item.category}</Text>
+            </View>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.stat}>
+                <Text style={styles.statIcon}>👁️</Text>
+                <Text style={styles.statText}>{item.views || 0} lượt xem</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statIcon}>❤️</Text>
+                <Text style={styles.statText}>{item.likes || 0} lượt thích</Text>
+              </View>
+              {item.author?.fullName && (
+                <View style={styles.stat}>
+                  <Text style={styles.statIcon}>✍️</Text>
+                  <Text style={styles.statText}>{item.author.fullName}</Text>
+                </View>
+              )}
+            </View>
           </View>
-        )}
 
-        {/* Bottom spacing */}
-        <View style={{ height: spacing.xxxl }} />
-      </ScrollView>
-    </SafeAreaView>
+          {/* Main Content */}
+          <View style={styles.detailContent}>
+            {renderContent()}
+          </View>
+
+          {/* Vocabulary */}
+          {renderVocabulary()}
+
+          {/* Related Items */}
+          {relatedItems.length > 0 && (
+            <View style={styles.relatedSection}>
+              <Text style={styles.relatedTitle}>Nội dung liên quan</Text>
+              {relatedItems.map((relatedItem) => (
+                <TouchableOpacity
+                  key={relatedItem._id}
+                  style={styles.relatedItem}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(student)/culture/[id]',
+                      params: { 
+                        id: relatedItem._id,
+                        itemTitle: relatedItem.title 
+                      }
+                    });
+                  }}
+                >
+                  <View style={styles.relatedItemContent}>
+                    {relatedItem.image && (
+                      <Image 
+                        source={{ uri: relatedItem.image }} 
+                        style={styles.relatedItemImage}
+                      />
+                    )}
+                    <View style={styles.relatedItemText}>
+                      <Text style={styles.relatedItemTitle}>{relatedItem.title}</Text>
+                      <Text style={styles.relatedItemDescription} numberOfLines={2}>
+                        {relatedItem.subtitle || relatedItem.content?.[0]?.content || 'Không có mô tả'}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Bottom spacing */}
+          <View style={{ height: spacing.xxxl }} />
+        </ScrollView>
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 };
@@ -266,7 +296,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
-    paddingTop: spacing.xl, // Match exam page header positioning
+    paddingTop: spacing.xl,
     backgroundColor: '#269a56ff',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20
@@ -308,6 +338,32 @@ const styles = StyleSheet.create({
   content: {
     flex: 1
   },
+
+  // Hero Image
+  heroImageContainer: {
+    position: 'relative',
+    marginBottom: spacing.md
+  },
+  heroImage: {
+    width: '100%',
+    height: 200
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    backgroundColor: '#FFD700',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 4
+  },
+  premiumBadgeText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '700'
+  },
+
+  // Title Section
   titleSection: {
     backgroundColor: palette.white,
     padding: spacing.lg,
@@ -320,58 +376,40 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#269a56ff',
     fontWeight: '600',
-    marginBottom: spacing.sm
+    marginBottom: spacing.md,
+    lineHeight: 22
   },
-  description: {
-    fontSize: 16,
-    color: '#6B7280',
-    lineHeight: 24,
-    marginBottom: spacing.md
-  },
-  difficultyBadge: {
+  categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#E8F5E8',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 12
+    borderRadius: 12,
+    marginBottom: spacing.md
   },
-  difficultyText: {
+  categoryBadgeText: {
     fontSize: 14,
-    color: '#0369A1',
+    color: '#269a56ff',
     fontWeight: '600'
   },
-
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xxxl
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: spacing.sm
-  },
-
-  // Meta Info
-  metaInfo: {
-    backgroundColor: '#F8F9FA',
-    padding: spacing.md,
-    borderRadius: 12,
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginTop: spacing.md
   },
-  metaLabel: {
-    fontSize: 14,
-    color: '#6B7280',
+  stat: {
+    alignItems: 'center'
+  },
+  statIcon: {
+    fontSize: 16,
     marginBottom: spacing.xs
   },
-  metaValue: {
-    fontWeight: '600',
-    color: colors.light.text
+  statText: {
+    fontSize: 12,
+    color: '#6B7280'
   },
 
   // Detail Content
@@ -380,183 +418,64 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.lg
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.light.text,
-    marginBottom: spacing.md,
-    lineHeight: 26
+  contentSection: {
+    marginBottom: spacing.lg
   },
   contentText: {
     fontSize: 16,
     color: colors.light.text,
     lineHeight: 26,
-    marginBottom: spacing.md,
     textAlign: 'justify'
   },
-
-  // Sunbae-Hoobae specific
-  illustrationContainer: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    alignItems: 'center'
-  },
-  characterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%'
-  },
-  character: {
-    alignItems: 'center'
-  },
-  characterEmoji: {
-    fontSize: 48,
-    marginBottom: spacing.sm
-  },
-  characterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EA580C'
-  },
-
-  // Image
   imageSection: {
-    marginVertical: spacing.md
+    marginVertical: spacing.lg
   },
   contentImage: {
     width: '100%',
-    height: 150,
+    height: 200,
     borderRadius: 12
   },
-
-  // Highlight box
-  highlightBox: {
-    backgroundColor: '#E8F5E8',
-    borderLeftWidth: 4,
-    borderLeftColor: '#269a56ff',
-    padding: spacing.md,
-    borderRadius: 8,
-    marginTop: spacing.md
-  },
-  highlightTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#166534',
-    marginBottom: spacing.sm
-  },
-  highlightText: {
+  imageCaption: {
     fontSize: 14,
-    color: '#166534',
-    lineHeight: 20
-  },
-
-  // K-pop specific
-  heroSection: {
-    alignItems: 'center',
-    marginBottom: spacing.lg
-  },
-  heroTitle: {
-    fontSize: 32,
-    marginBottom: spacing.sm
-  },
-  heroSubtitle: {
-    fontSize: 18,
     color: '#6B7280',
-    fontStyle: 'italic'
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: spacing.sm
   },
 
-  // Timeline
-  timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingLeft: spacing.md
-  },
-  timelineYear: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#269a56ff',
-    width: 60
-  },
-  timelineEvent: {
-    fontSize: 16,
-    color: colors.light.text,
-    flex: 1
-  },
-
-  // Food specific
-  foodGrid: {
-    alignItems: 'center',
-    marginBottom: spacing.lg
-  },
-  foodGridTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  // Vocabulary
+  vocabularySection: {
+    backgroundColor: palette.white,
+    padding: spacing.lg,
     marginBottom: spacing.md
   },
-  dishesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: spacing.md
-  },
-  dishItem: {
-    backgroundColor: '#FFF7ED',
-    padding: spacing.sm,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center'
-  },
-  dishEmoji: {
-    fontSize: 14
-  },
-
-  // Tip box
-  tipBox: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
-    padding: spacing.md,
-    marginTop: spacing.md
-  },
-  tipTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#D97706',
+    color: colors.light.text,
+    marginBottom: spacing.md
+  },
+  vocabItem: {
+    backgroundColor: '#F8F9FA',
+    padding: spacing.md,
+    borderRadius: 8,
     marginBottom: spacing.sm
   },
-  tipText: {
-    fontSize: 14,
-    color: '#D97706',
-    lineHeight: 20
-  },
-
-  // Tags
-  tagsSection: {
-    marginTop: spacing.lg
-  },
-  tagsSectionTitle: {
+  vocabWord: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.light.text,
-    marginBottom: spacing.sm
+    marginBottom: spacing.xs
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs
-  },
-  tag: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8
-  },
-  tagText: {
-    fontSize: 12,
+  vocabPronunciation: {
+    fontSize: 14,
     color: '#6B7280',
-    fontWeight: '500'
+    fontWeight: '400'
+  },
+  vocabMeaning: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20
   },
 
   // Related Items
@@ -573,9 +492,21 @@ const styles = StyleSheet.create({
   },
   relatedItem: {
     backgroundColor: '#F8F9FA',
-    padding: spacing.md,
     borderRadius: 12,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    overflow: 'hidden'
+  },
+  relatedItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  relatedItemImage: {
+    width: 80,
+    height: 80
+  },
+  relatedItemText: {
+    flex: 1,
+    padding: spacing.md
   },
   relatedItemTitle: {
     fontSize: 16,
@@ -583,29 +514,22 @@ const styles = StyleSheet.create({
     color: colors.light.text,
     marginBottom: spacing.xs
   },
-
-  // New styles for formatted content
-  contentSection: {
-    marginBottom: spacing.lg
-  },
-  sectionHeader: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-    paddingLeft: spacing.xs
-  },
-  sectionHeaderText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#269a56ff',
-    lineHeight: 24
-  },
-  paragraph: {
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs
-  },
   relatedItemDescription: {
     fontSize: 14,
     color: '#6B7280'
+  },
+
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xxxl
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: spacing.sm
   },
 
   // Error

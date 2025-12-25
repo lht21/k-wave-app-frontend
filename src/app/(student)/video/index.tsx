@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { spacing } from '../../theme/spacing';
-import { colors, palette } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import { spacing } from '../../../theme/spacing';
+import { colors, palette } from '../../../theme/colors';
+import { typography } from '../../../theme/typography';
 
 const VideoCategory: React.FC = () => {
   const router = useRouter();

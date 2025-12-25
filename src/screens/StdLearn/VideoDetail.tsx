@@ -9,6 +9,7 @@ import {
   Modal,
   Switch
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
@@ -238,18 +239,22 @@ const VideoDetail: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{videoTitle}</Text>
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Text style={styles.favoriteIcon}>🤍</Text>
-        </TouchableOpacity>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle} numberOfLines={1}>{videoTitle}</Text>
+            <TouchableOpacity style={styles.favoriteButton}>
+              <Text style={styles.favoriteIcon}>🤍</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
 
       {/* Video Player */}
@@ -296,20 +301,21 @@ const VideoDetail: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#fff'
   },
 
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
-    backgroundColor: '#269a56ff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20
+    marginTop: 10,
   },
   backButton: {
     width: 40,
@@ -320,14 +326,14 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   backButtonText: {
-    fontSize: 20,
-    color: palette.white,
-    fontWeight: '600'
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold'
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: palette.white,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
     flex: 1,
     textAlign: 'center',
     marginHorizontal: spacing.md

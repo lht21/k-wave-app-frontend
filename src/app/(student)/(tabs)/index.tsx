@@ -17,10 +17,10 @@ const HomeStd: React.FC = () => {
   // Giữ nguyên Logic Data
   const learningModules = [
     { id: '1', title: 'Lộ trình', icon: '🛣️', navigateTo: '/(student)/roadmap/roadmap' },
-    { id: '2', title: 'Thi thử', icon: '🎯', navigateTo: '/(student)/exam/practice' },
+    { id: '2', title: 'Thi thử', icon: '🎯', navigateTo: '/(student)/exam/trial' },
     { id: '3', title: 'Luyện thi', icon: '⏰', navigateTo: '/(student)/exam/real' },
-    { id: '4', title: 'Video', icon: '🎥', navigateTo: '/(student)/video-learning' },
-    { id: '5', title: 'Văn hoá', icon: '🏛️', navigateTo: '/(student)/culture' },
+    { id: '4', title: 'Video', icon: '🎥', navigateTo: '/(student)/video/learning' },
+    { id: '5', title: 'Văn hoá', icon: '🏛️', navigateTo: '/(student)/culture/culture-list' },
     { id: '6', title: 'Tin tức', icon: '📰', navigateTo: '/(student)/news/news' }
   ]
 
@@ -52,7 +52,7 @@ const HomeStd: React.FC = () => {
   const CultureItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.cultureRow}
-      onPress={() => router.push('/(student)/culture')}
+      onPress={() => router.push('/(student)/culture/culture-list')}
     >
       <View style={styles.cultureIconCircle}>
         <Text style={{ fontSize: 20 }}>{item.icon}</Text>

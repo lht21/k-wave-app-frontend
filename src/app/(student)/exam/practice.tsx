@@ -10,11 +10,13 @@ import {
   Dimensions,
   TextInput,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Clock, CheckCircle, Play, Pause, Microphone, Stop } from 'phosphor-react-native';
 import { useExam } from '../../../hooks/useExam';
 import { Exam, QuestionData, ListeningQuestionData, ReadingQuestionData, WritingQuestionData } from '../../../services/examService';
+import { examService } from '../../../services/examService';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +36,12 @@ export default function PracticeExam() {
   const router = useRouter();
   const { fetchExamDetail } = useExam();
   
+  // Get sectionType from params if provided (for single skill exam)
+  const selectedSectionType = params.sectionType as 'listening' | 'reading' | 'writing' | undefined;
+  const sectionDuration = params.sectionDuration ? parseInt(params.sectionDuration as string) : undefined;
+  const isTrialMode = params.isTrialMode === 'true'; // Trial mode = no timer
+  const isSingleSkillExam = !!selectedSectionType;
+  
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentSection, setCurrentSection] = useState<'listening' | 'reading' | 'writing' | 'speaking'>('listening');
@@ -41,24 +49,46 @@ export default function PracticeExam() {
   const [answers, setAnswers] = useState<{ [key: string]: number }>({});
   const [writingAnswers, setWritingAnswers] = useState<{ [key: string]: string }>({});
   const [speakingRecordings, setSpeakingRecordings] = useState<{ [key: string]: string }>({});
-  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); // Countdown timer in seconds
   const [showResults, setShowResults] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [examResults, setExamResults] = useState<{
+    correctCount: number;
+    totalCount: number;
+    score: number;
+    timeTaken: number;
+  } | null>(null);
+  
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     loadExam();
   }, []);
 
-  // Timer
+  // Initialize timer when exam loads
   useEffect(() => {
-    if (!loading && !showResults) {
+    if (exam && !loading && sectionDuration && !isTrialMode) {
+      // Set countdown timer for single skill exam (not in trial mode)
+      setTimeRemaining(sectionDuration * 60); // Convert minutes to seconds
+    }
+  }, [exam, loading, sectionDuration, isTrialMode]);
+
+  // Countdown Timer (only when not in trial mode)
+  useEffect(() => {
+    if (!loading && !showResults && timeRemaining !== null && !isTrialMode) {
+      if (timeRemaining <= 0) {
+        // Time's up - auto submit
+        handleFinish();
+        return;
+      }
+      
       const timer = setInterval(() => {
-        setTimeElapsed(prev => prev + 1);
+        setTimeRemaining(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [loading, showResults]);
+  }, [loading, showResults, timeRemaining, isTrialMode]);
 
   const loadExam = async () => {
     try {
@@ -74,20 +104,31 @@ export default function PracticeExam() {
       });
       setExam(data);
       
-      // Auto-select first available section based on what teacher created
-      if (data.questions.listening && data.questions.listening.length > 0) {
-        setCurrentSection('listening');
-        console.log('📍 Starting with Listening section');
-      } else if (data.questions.reading && data.questions.reading.length > 0) {
-        setCurrentSection('reading');
-        console.log('📍 Starting with Reading section');
-      } else if (data.questions.writing && data.questions.writing.length > 0) {
-        setCurrentSection('writing');
-        console.log('📍 Starting with Writing section');
+      // If sectionType is specified, use only that section
+      if (isSingleSkillExam && selectedSectionType) {
+        if (data.questions[selectedSectionType] && data.questions[selectedSectionType].length > 0) {
+          setCurrentSection(selectedSectionType);
+          console.log(`📍 Single skill exam - Starting with ${selectedSectionType} section`);
+        } else {
+          Alert.alert('Thông báo', 'Kỹ năng này chưa có câu hỏi');
+          router.back();
+        }
       } else {
-        // No questions available
-        Alert.alert('Thông báo', 'Đề thi chưa có câu hỏi');
-        router.back();
+        // Auto-select first available section based on what teacher created
+        if (data.questions.listening && data.questions.listening.length > 0) {
+          setCurrentSection('listening');
+          console.log('📍 Starting with Listening section');
+        } else if (data.questions.reading && data.questions.reading.length > 0) {
+          setCurrentSection('reading');
+          console.log('📍 Starting with Reading section');
+        } else if (data.questions.writing && data.questions.writing.length > 0) {
+          setCurrentSection('writing');
+          console.log('📍 Starting with Writing section');
+        } else {
+          // No questions available
+          Alert.alert('Thông báo', 'Đề thi chưa có câu hỏi');
+          router.back();
+        }
       }
     } catch (error) {
       console.error('❌ Error loading exam:', error);
@@ -101,6 +142,16 @@ export default function PracticeExam() {
   // Get available sections based on what teacher created
   const getAvailableSections = (): Array<'listening' | 'reading' | 'writing'> => {
     if (!exam) return [];
+    
+    // If single skill exam, only return that section
+    if (isSingleSkillExam && selectedSectionType) {
+      if (exam.questions[selectedSectionType] && exam.questions[selectedSectionType].length > 0) {
+        return [selectedSectionType];
+      }
+      return [];
+    }
+    
+    // Otherwise return all available sections
     const sections: Array<'listening' | 'reading' | 'writing'> = [];
     
     if (exam.questions.listening && exam.questions.listening.length > 0) {
@@ -162,21 +213,141 @@ export default function PracticeExam() {
     index: currentQuestionIndex,
     hasQuestion: !!currentQuestion,
     questionType: currentQuestion?.type,
-    questionTitle: currentQuestion?.title
+    questionTitle: currentQuestion?.title,
+    questionData: currentQuestion
   });
 
   // Audio player handlers
-  const handlePlayAudio = () => {
-    console.log('🎵 Playing audio...');
-    setIsPlayingAudio(true);
-    // TODO: Implement actual audio playback with expo-av
-    setTimeout(() => setIsPlayingAudio(false), 3000); // Mock playback
+  const handlePlayAudio = async () => {
+    try {
+      console.log('🎵 Playing audio...');
+      
+      if (!currentQuestion || currentQuestion.type !== 'listening') {
+        Alert.alert('Lỗi', 'Đây không phải là câu hỏi nghe');
+        return;
+      }
+
+      if (!currentQuestion.audioUrl) {
+        Alert.alert('Lỗi', 'Không có file audio cho câu hỏi này');
+        console.log('❌ No audio URL found for question:', currentQuestion);
+        return;
+      }
+
+      console.log('📁 Audio URL:', currentQuestion.audioUrl);
+
+      // Stop current audio if playing
+      if (soundRef.current) {
+        console.log('⏸️ Stopping current audio...');
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      // Set audio mode
+      console.log('⚙️ Setting audio mode...');
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Xử lý URL audio - kiểm tra nếu là URL đầy đủ hoặc cần thêm base URL
+      let audioUri = currentQuestion.audioUrl;
+      
+      // Thay thế localhost bằng IP thực vì điện thoại không thể truy cập localhost
+      if (audioUri.includes('localhost')) {
+        audioUri = audioUri.replace('localhost', '192.168.1.9');
+        console.log('🔄 Replaced localhost with IP:', audioUri);
+      }
+      
+      // Nếu URL không bắt đầu bằng http, thêm base URL
+      if (!audioUri.startsWith('http://') && !audioUri.startsWith('https://')) {
+        // Nếu là đường dẫn tương đối, thêm base URL
+        const baseUrl = 'http://192.168.1.9:5000'; // Lấy từ API_BASE_URL
+        audioUri = audioUri.startsWith('/') ? `${baseUrl}${audioUri}` : `${baseUrl}/${audioUri}`;
+      }
+
+      console.log('🔗 Final audio URI:', audioUri);
+
+      // Load and play audio
+      console.log('📥 Loading audio...');
+      const { sound, status } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate
+      );
+
+      if (status.isLoaded) {
+        soundRef.current = sound;
+        setIsPlayingAudio(true);
+        console.log('✅ Audio loaded and playing');
+      } else {
+        console.log('❌ Audio failed to load:', status);
+        Alert.alert('Lỗi', 'Không thể tải file audio');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Error playing audio:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      Alert.alert(
+        'Lỗi phát audio', 
+        `Không thể phát audio. Lỗi: ${error.message || 'Unknown error'}`
+      );
+      setIsPlayingAudio(false);
+    }
   };
 
-  const handleStopAudio = () => {
-    console.log('⏸️ Stopping audio...');
-    setIsPlayingAudio(false);
+  const handleStopAudio = async () => {
+    try {
+      console.log('⏸️ Stopping audio...');
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+      setIsPlayingAudio(false);
+    } catch (error) {
+      console.error('❌ Error stopping audio:', error);
+      setIsPlayingAudio(false);
+    }
   };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    console.log('📡 Playback status update:', {
+      isLoaded: status.isLoaded,
+      isPlaying: status.isPlaying,
+      didJustFinish: status.didJustFinish,
+      error: status.error
+    });
+    
+    if (status.isLoaded) {
+      if (status.didJustFinish) {
+        console.log('✅ Audio finished playing');
+        setIsPlayingAudio(false);
+        if (soundRef.current) {
+          soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
+      }
+    } else if (status.error) {
+      console.error('❌ Audio playback error:', status.error);
+      setIsPlayingAudio(false);
+      Alert.alert('Lỗi', `Lỗi khi phát audio: ${status.error}`);
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   // Recording handlers
   const handleStartRecording = () => {
@@ -239,24 +410,109 @@ export default function PracticeExam() {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Nộp bài',
-          onPress: () => {
-            calculateResults();
-            setShowResults(true);
+          onPress: async () => {
+            await submitExamResults();
           }
         }
       ]
     );
   };
 
-  const calculateResults = () => {
+  const submitExamResults = async () => {
     if (!exam) return;
+
+    try {
+      // Stop any playing audio
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      // Calculate time spent
+      const timeSpent = timeRemaining !== null && sectionDuration
+        ? (sectionDuration * 60) - timeRemaining
+        : 0;
+
+      // Kiểm tra xem bài thi có câu trắc nghiệm không
+      const hasMultipleChoice = (currentSection === 'listening' || currentSection === 'reading') && 
+                                 Object.keys(answers).length > 0;
+      const hasWriting = currentSection === 'writing' && Object.keys(writingAnswers).length > 0;
+      
+      // Submit to backend
+      const result = await examService.submitExamResult({
+        examId: exam._id,
+        answers,
+        writingAnswers,
+        timeSpent,
+        isTrialMode,
+        sectionType: selectedSectionType || currentSection
+      });
+
+      console.log('✅ Exam submitted successfully:', result);
+
+      // Hiển thị kết quả tùy theo loại bài thi
+      if (hasMultipleChoice) {
+        // Bài thi Nghe/Đọc: Tính và hiển thị điểm ngay
+        const results = calculateDetailedResults();
+        setExamResults(results);
+        setShowResults(true);
+      } else if (hasWriting) {
+        // Bài thi Viết: Chỉ thông báo đã gửi cho giáo viên
+        Alert.alert(
+          '✅ Đã nộp bài thành công',
+          'Bài viết của bạn đã được gửi đến giáo viên. Vui lòng chờ giáo viên chấm điểm.',
+          [
+            {
+              text: 'Quay lại',
+              onPress: () => router.back()
+            }
+          ]
+        );
+      } else {
+        // Trường hợp khác
+        Alert.alert(
+          '✅ Đã nộp bài thành công',
+          'Bài thi của bạn đã được nộp thành công.',
+          [
+            {
+              text: 'Quay lại',
+              onPress: () => router.back()
+            }
+          ]
+        );
+      }
+
+    } catch (error) {
+      console.error('❌ Error submitting exam:', error);
+      Alert.alert(
+        'Lỗi',
+        'Không thể nộp bài. Vui lòng thử lại.',
+        [
+          { text: 'Thử lại', onPress: () => submitExamResults() },
+          { text: 'Hủy', style: 'cancel' }
+        ]
+      );
+    }
+  };
+
+  const calculateDetailedResults = () => {
+    if (!exam) return { correctCount: 0, totalCount: 0, score: 0, timeTaken: 0 };
     
     let correctCount = 0;
     let totalCount = 0;
     
-    // Calculate for all sections
-    ['listening', 'reading', 'writing'].forEach((section) => {
-      const questions = exam.questions[section as 'listening' | 'reading' | 'writing'];
+    // Chỉ tính điểm cho section hiện tại nếu là listening hoặc reading
+    const sectionsToCalculate = selectedSectionType 
+      ? [selectedSectionType] 
+      : (currentSection === 'listening' || currentSection === 'reading') 
+        ? [currentSection] 
+        : ['listening', 'reading'];
+    
+    sectionsToCalculate.forEach((section) => {
+      if (section === 'writing') return; // Không tính điểm tự động cho writing
+      
+      const questions = exam.questions[section as 'listening' | 'reading'];
       if (!questions) return;
       
       questions.forEach((question) => {
@@ -278,31 +534,76 @@ export default function PracticeExam() {
     
     const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
     
+    // Calculate time taken
+    const timeTaken = timeRemaining !== null && sectionDuration
+      ? (sectionDuration * 60) - timeRemaining
+      : 0;
+    
     console.log('📊 Results:', {
       correctCount,
       totalCount,
       score,
-      timeElapsed: formatTime(timeElapsed)
+      timeTaken: formatTime(timeTaken)
     });
     
-    // Show results screen
-    Alert.alert(
-      '🎉 Hoàn thành!',
-      `Điểm số: ${score}/100\nĐúng: ${correctCount}/${totalCount} câu\nThời gian: ${formatTime(timeElapsed)}`,
-      [
-        {
-          text: 'Xem chi tiết',
-          onPress: () => {
-            // TODO: Navigate to detailed results screen
-            router.back();
-          }
-        },
-        {
-          text: 'Quay lại',
-          onPress: () => router.back(),
-          style: 'cancel'
-        }
-      ]
+    return { correctCount, totalCount, score, timeTaken };
+  };
+
+  // Render results modal
+  const renderResultsModal = () => {
+    if (!showResults || !examResults) return null;
+
+    return (
+      <View style={styles.resultsOverlay}>
+        <View style={styles.resultsModal}>
+          <Text style={styles.resultsTitle}>🎉 Hoàn thành bài thi!</Text>
+          
+          <View style={styles.resultsContent}>
+            <View style={styles.scoreCircle}>
+              <Text style={styles.scoreNumber}>{examResults.score}</Text>
+              <Text style={styles.scoreLabel}>Điểm</Text>
+            </View>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>✅ Câu đúng:</Text>
+                <Text style={styles.statValue}>{examResults.correctCount}/{examResults.totalCount}</Text>
+              </View>
+              
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>❌ Câu sai:</Text>
+                <Text style={styles.statValue}>{examResults.totalCount - examResults.correctCount}/{examResults.totalCount}</Text>
+              </View>
+              
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>⏱️ Thời gian:</Text>
+                <Text style={styles.statValue}>{formatTime(examResults.timeTaken)}</Text>
+              </View>
+              
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>📊 Tỷ lệ đúng:</Text>
+                <Text style={styles.statValue}>
+                  {examResults.totalCount > 0 
+                    ? Math.round((examResults.correctCount / examResults.totalCount) * 100) 
+                    : 0}%
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.resultsActions}>
+            <TouchableOpacity
+              style={styles.resultButton}
+              onPress={() => {
+                setShowResults(false);
+                router.back();
+              }}
+            >
+              <Text style={styles.resultButtonText}>Quay lại</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
     );
   };
 
@@ -357,6 +658,9 @@ export default function PracticeExam() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Results Modal */}
+      {renderResultsModal()}
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -365,15 +669,25 @@ export default function PracticeExam() {
         <View style={styles.headerCenter}>
           <Text style={styles.examTitle}>{exam.title}</Text>
           <Text style={styles.sectionTitle}>
+            {isSingleSkillExam ? '📌 ' : ''}
             {currentSection === 'listening' ? '🎧 Nghe' : 
              currentSection === 'reading' ? '📖 Đọc' : 
              currentSection === 'writing' ? '✍️ Viết' : '🎤 Nói'}
+            {isSingleSkillExam ? ' (Riêng lẻ)' : ''}
+            {isTrialMode ? ' - Thi thử' : ''}
           </Text>
         </View>
-        <View style={styles.timerContainer}>
-          <Clock size={20} color={COLORS.primaryGreen} />
-          <Text style={styles.timerText}>{formatTime(timeElapsed)}</Text>
-        </View>
+        {!isTrialMode && timeRemaining !== null && (
+          <View style={styles.timerContainer}>
+            <Clock size={20} color={timeRemaining < 300 ? COLORS.incorrectRed : COLORS.primaryGreen} />
+            <Text style={[
+              styles.timerText,
+              timeRemaining < 300 && { color: COLORS.incorrectRed }
+            ]}>
+              {formatTime(timeRemaining)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Progress Bar */}
@@ -402,31 +716,37 @@ export default function PracticeExam() {
           {/* ========== LISTENING: Audio Player + Multiple Choice ========== */}
           {currentQuestion.type === 'listening' && (
             <>
-              {currentQuestion.audioUrl && (
-                <View style={styles.audioContainer}>
-                  <Text style={styles.audioLabel}>🎧 Nghe Audio</Text>
-                  <View style={styles.audioControls}>
-                    <TouchableOpacity 
-                      style={styles.audioButton}
-                      onPress={isPlayingAudio ? handleStopAudio : handlePlayAudio}
-                    >
-                      {isPlayingAudio ? (
-                        <Pause size={32} color={COLORS.white} weight="fill" />
-                      ) : (
-                        <Play size={32} color={COLORS.white} weight="fill" />
-                      )}
-                    </TouchableOpacity>
-                    <Text style={styles.audioInstruction}>
-                      {isPlayingAudio ? 'Đang phát...' : 'Nhấn để nghe'}
-                    </Text>
+              <View style={styles.audioContainer}>
+                <Text style={styles.audioLabel}>🎧 Nghe Audio</Text>
+                {currentQuestion.audioUrl ? (
+                  <>
+                    <View style={styles.audioControls}>
+                      <TouchableOpacity 
+                        style={styles.audioButton}
+                        onPress={isPlayingAudio ? handleStopAudio : handlePlayAudio}
+                      >
+                        {isPlayingAudio ? (
+                          <Pause size={32} color={COLORS.white} weight="fill" />
+                        ) : (
+                          <Play size={32} color={COLORS.white} weight="fill" />
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.audioInstruction}>
+                        {isPlayingAudio ? 'Đang phát...' : 'Nhấn để nghe'}
+                      </Text>
+                    </View>
+                    {currentQuestion.transcript && (
+                      <TouchableOpacity style={styles.transcriptToggle}>
+                        <Text style={styles.transcriptText}>📄 Xem transcript</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  <View style={styles.noAudioContainer}>
+                    <Text style={styles.noAudioText}>⚠️ Chưa có file audio</Text>
                   </View>
-                  {currentQuestion.transcript && (
-                    <TouchableOpacity style={styles.transcriptToggle}>
-                      <Text style={styles.transcriptText}>📄 Xem transcript</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
+                )}
+              </View>
               
               {/* Listening Sub-questions */}
               {'questions' in currentQuestion && 
@@ -528,22 +848,22 @@ export default function PracticeExam() {
           {/* ========== WRITING: Essay Input ========== */}
           {currentQuestion.type === 'writing' && (
             <>
-              {currentQuestion.prompt && (
-                <View style={styles.writingPrompt}>
-                  <Text style={styles.promptLabel}>✍️ Đề bài</Text>
+              <View style={styles.writingPrompt}>
+                <Text style={styles.promptLabel}>✍️ Đề bài</Text>
+                {currentQuestion.prompt && (
                   <Text style={styles.promptText}>{currentQuestion.prompt}</Text>
-                  {currentQuestion.instruction && (
-                    <Text style={styles.instructionText}>
-                      💡 Hướng dẫn: {currentQuestion.instruction}
-                    </Text>
-                  )}
-                  {currentQuestion.minWords && (
-                    <Text style={styles.wordCountHint}>
-                      📝 Tối thiểu: {currentQuestion.minWords} từ
-                    </Text>
-                  )}
-                </View>
-              )}
+                )}
+                {currentQuestion.instruction && (
+                  <Text style={styles.instructionText}>
+                    💡 Hướng dẫn: {currentQuestion.instruction}
+                  </Text>
+                )}
+                {currentQuestion.minWords && (
+                  <Text style={styles.wordCountHint}>
+                    📝 Tối thiểu: {currentQuestion.minWords} từ
+                  </Text>
+                )}
+              </View>
               
               <View style={styles.writingInputContainer}>
                 <Text style={styles.inputLabel}>Câu trả lời của bạn:</Text>
@@ -748,6 +1068,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textGray,
   },
+  noAudioContainer: {
+    padding: 16,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  noAudioText: {
+    fontSize: 14,
+    color: COLORS.textGray,
+    fontStyle: 'italic',
+  },
   transcriptToggle: {
     marginTop: 16,
     paddingVertical: 8,
@@ -948,6 +1279,101 @@ const styles = StyleSheet.create({
   },
   finishButtonText: {
     fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  resultsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: 20,
+  },
+  resultsModal: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 30,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  resultsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  resultsContent: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  scoreCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COLORS.primaryGreen,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: COLORS.primaryGreen,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  scoreNumber: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  scoreLabel: {
+    fontSize: 16,
+    color: COLORS.white,
+    marginTop: 4,
+  },
+  statsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBg,
+  },
+  statLabel: {
+    fontSize: 15,
+    color: COLORS.textGray,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+  resultsActions: {
+    gap: 12,
+  },
+  resultButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryGreen,
+    alignItems: 'center',
+  },
+  resultButtonText: {
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.white,
   },

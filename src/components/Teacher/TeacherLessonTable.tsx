@@ -18,26 +18,25 @@ import ModalLesson from '../Modal/ModalLesson';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { lessonService, Lesson } from '../../services/lessonService';
-import { PencilSimpleIcon, PlusCircleIcon, TrashIcon, EyeIcon } from 'phosphor-react-native';
+import { PencilSimpleIcon, PlusCircleIcon, TrashIcon, EyeIcon, PaperPlaneTilt  } from 'phosphor-react-native';
+import { blue } from 'react-native-reanimated/lib/typescript/Colors';
 
 const UI_COLORS = {
-  primaryGreen: '#00D95F',
-  lightMint: '#A7FFEB',
+  primaryGreen: '#08b146',
+  lightMint: 'rgb(220 252 231)',
   textDark: '#1A1A1A',
   textGray: '#666666',
   cardBg: '#FFFFFF',
   borderGray: '#EEEEEE',
   danger: '#FF5252',
   warning: '#FFAB00',
+  blue: '#007BFF',
 };
 
 // Types
 interface TeacherLessonTableProps {
     selectedLevel: string;
 }
-
-
-
 
 const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel = 'Sơ cấp 1' }) => {
     const router = useRouter();
@@ -49,16 +48,30 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [selectedStatus, setSelectedStatus] = useState<
+    'all' | 'draft' | 'pending' | 'approved' | 'rejected'
+    >('all');
 
     useEffect(() => {
         loadLessons();
-    }, [selectedLevel]);
+    }, [selectedLevel, selectedStatus]);
 
     // Load bài học từ API
     const loadLessons = async () => {
         try {
             setIsLoading(true);
-            const response = await lessonService.getLessons({ level: selectedLevel });
+            const params: any = {
+                level: selectedLevel,
+                page: 1,
+                limit: 100
+            };
+
+            if (selectedStatus !== 'all') {
+                params.status = selectedStatus;
+            }
+
+            const response = await lessonService.getMyLessons(params);
+            setLessons(response.lessons);
             setLessons(response.lessons);
         } catch (error: any) {
             console.error('Error loading lessons:', error);
@@ -83,6 +96,81 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         setIsAdding(true);
         setEditingLesson(null);
         setIsModalOpen(true);
+    };
+
+    const getStatusLabel = (status: string) => {
+    switch (status) {
+        case 'draft':
+            return 'Bản nháp';
+        case 'pending':
+            return 'Chờ duyệt';
+        case 'approved':
+            return 'Đã duyệt';
+        case 'rejected':
+            return 'Bị từ chối';
+        default:
+            return 'Không xác định';
+    }
+    };
+const getStatusStyle = (status: string) => {
+  switch (status) {
+    case 'draft':
+      return {
+        backgroundColor: '#E0E0E0', // xám
+        color: '#555555',
+      };
+    case 'pending':
+      return {
+        backgroundColor: '#FFF3CD', // vàng nhạt
+        color: '#FF9800',
+      };
+    case 'approved':
+      return {
+        backgroundColor: '#DCFCE7', // xanh nhạt
+        color: '#16A34A',
+      };
+    case 'rejected':
+      return {
+        backgroundColor: '#FEE2E2', // đỏ nhạt
+        color: '#DC2626',
+      };
+    default:
+      return {
+        backgroundColor: '#E5E7EB',
+        color: '#374151',
+      };
+  }
+};
+
+    const handleSubmitForApproval = async (lessonId: string) => {
+        Alert.alert(
+            'Gửi duyệt',
+            'Gửi bài học này cho admin duyệt?',
+            [
+            { text: 'Hủy', style: 'cancel' },
+            {
+                text: 'Gửi',
+                onPress: async () => {
+                try {
+                    const updatedLesson = await lessonService.updateLesson(
+                    lessonId,
+                        { status: 'pending' }
+                    );
+
+                    setLessons(prev =>
+                    prev.map(l =>
+                        l._id === lessonId ? updatedLesson : l
+                    )
+                    );
+
+                    Alert.alert('Thành công', 'Đã gửi bài học cho admin duyệt');
+                } catch (error: any) {
+                    Alert.alert('Lỗi', error.message || 'Không thể gửi duyệt');
+                }
+                },
+            },
+            ]
+        );
     };
 
     const handleEditLesson = (lessonId: string): void => {
@@ -260,14 +348,38 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
 
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.iconBtn}  onPress={() => handleViewDetails(item._id!)}>
-            <EyeIcon size={22} color={UI_COLORS.primaryGreen} />
+            <EyeIcon size={22} color={UI_COLORS.blue} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEditLesson(item._id!)}>
-            <PencilSimpleIcon size={22} color={UI_COLORS.warning} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDeleteLesson(item._id!)}>
+            <TouchableOpacity
+                disabled={item.status === 'approved'}
+                style={[
+                    styles.iconBtn,
+                    item.status === 'approved' && { opacity: 0.4 }
+                ]}
+                onPress={() => handleEditLesson(item._id!)}
+            >
+                <PencilSimpleIcon size={22} color={UI_COLORS.warning} />
+            </TouchableOpacity>
+          
+          {(item.status === 'draft' || item.status === 'rejected') && (
+            <TouchableOpacity
+                onPress={() => handleSubmitForApproval(item._id!)}
+                style={styles.iconBtn}
+            >
+                <PaperPlaneTilt  size={22} color={UI_COLORS.primaryGreen} />
+            </TouchableOpacity>
+          )}
+
+            <TouchableOpacity
+            disabled={item.status === 'approved'}
+            style={[
+                styles.iconBtn,
+                item.status === 'approved' && { opacity: 0.4 }
+            ]}
+            onPress={() => handleDeleteLesson(item._id!)}
+            >
             <TrashIcon size={22} color={UI_COLORS.danger} />
-          </TouchableOpacity>
+            </TouchableOpacity>
         </View>
       </View>
 
@@ -280,9 +392,26 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                 <Text style={styles.premiumText}>Premium</Text>
             </View>
         )}
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Mã bài: {item.code}</Text>
-        </View>
+        {(() => {
+        const statusStyle = getStatusStyle(item.status);
+            return (
+                <View
+                    style={[
+                        styles.badge,
+                        { backgroundColor: statusStyle.backgroundColor },
+                    ]}
+                >
+                <Text
+                    style={[
+                    styles.badgeText,
+                    { color: statusStyle.color },
+                    ]}
+                >
+                    {getStatusLabel(item.status)}
+                </Text>
+                </View>
+            );
+        })()}
 
       </View>
     </View>
@@ -319,6 +448,41 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
             <View style={styles.tableHeader}>
                 <Checkbox selected={isSelectAll} onPress={handleSelectAll} />
                 <Text style={styles.subtitle}>Chọn tất cả</Text>
+                
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {[
+                { label: 'Tất cả', value: 'all' },
+                { label: 'Nháp', value: 'draft' },
+                { label: 'Chờ duyệt', value: 'pending' },
+                { label: 'Đã duyệt', value: 'approved' },
+                { label: 'Từ chối', value: 'rejected' },
+            ].map(item => (
+                <TouchableOpacity
+                key={item.value}
+                onPress={() => setSelectedStatus(item.value as any)}
+                style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 16,
+                    backgroundColor:
+                    selectedStatus === item.value
+                        ? UI_COLORS.primaryGreen
+                        : '#EEE',
+                }}
+                >
+                <Text
+                    style={{
+                    color: selectedStatus === item.value ? '#FFF' : '#333',
+                    fontSize: 12,
+                    fontWeight: '600',
+                    }}
+                >
+                    {item.label}
+                </Text>
+                </TouchableOpacity>
+            ))}
             </View>
 
 
