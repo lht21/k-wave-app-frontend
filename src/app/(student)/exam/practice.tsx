@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Clock, CheckCircle, Play, Pause, Microphone, Stop } from 'phosphor-react-native';
 import { useExam } from '../../../hooks/useExam';
 import { Exam, QuestionData, ListeningQuestionData, ReadingQuestionData, WritingQuestionData } from '../../../services/examService';
+import { examService } from '../../../services/examService';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +35,12 @@ export default function PracticeExam() {
   const router = useRouter();
   const { fetchExamDetail } = useExam();
   
+  // Get sectionType from params if provided (for single skill exam)
+  const selectedSectionType = params.sectionType as 'listening' | 'reading' | 'writing' | undefined;
+  const sectionDuration = params.sectionDuration ? parseInt(params.sectionDuration as string) : undefined;
+  const isTrialMode = params.isTrialMode === 'true'; // Trial mode = no timer
+  const isSingleSkillExam = !!selectedSectionType;
+  
   const [exam, setExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentSection, setCurrentSection] = useState<'listening' | 'reading' | 'writing' | 'speaking'>('listening');
@@ -41,7 +48,7 @@ export default function PracticeExam() {
   const [answers, setAnswers] = useState<{ [key: string]: number }>({});
   const [writingAnswers, setWritingAnswers] = useState<{ [key: string]: string }>({});
   const [speakingRecordings, setSpeakingRecordings] = useState<{ [key: string]: string }>({});
-  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); // Countdown timer in seconds
   const [showResults, setShowResults] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -50,15 +57,29 @@ export default function PracticeExam() {
     loadExam();
   }, []);
 
-  // Timer
+  // Initialize timer when exam loads
   useEffect(() => {
-    if (!loading && !showResults) {
+    if (exam && !loading && sectionDuration && !isTrialMode) {
+      // Set countdown timer for single skill exam (not in trial mode)
+      setTimeRemaining(sectionDuration * 60); // Convert minutes to seconds
+    }
+  }, [exam, loading, sectionDuration, isTrialMode]);
+
+  // Countdown Timer (only when not in trial mode)
+  useEffect(() => {
+    if (!loading && !showResults && timeRemaining !== null && !isTrialMode) {
+      if (timeRemaining <= 0) {
+        // Time's up - auto submit
+        handleFinish();
+        return;
+      }
+      
       const timer = setInterval(() => {
-        setTimeElapsed(prev => prev + 1);
+        setTimeRemaining(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [loading, showResults]);
+  }, [loading, showResults, timeRemaining, isTrialMode]);
 
   const loadExam = async () => {
     try {
@@ -74,20 +95,31 @@ export default function PracticeExam() {
       });
       setExam(data);
       
-      // Auto-select first available section based on what teacher created
-      if (data.questions.listening && data.questions.listening.length > 0) {
-        setCurrentSection('listening');
-        console.log('📍 Starting with Listening section');
-      } else if (data.questions.reading && data.questions.reading.length > 0) {
-        setCurrentSection('reading');
-        console.log('📍 Starting with Reading section');
-      } else if (data.questions.writing && data.questions.writing.length > 0) {
-        setCurrentSection('writing');
-        console.log('📍 Starting with Writing section');
+      // If sectionType is specified, use only that section
+      if (isSingleSkillExam && selectedSectionType) {
+        if (data.questions[selectedSectionType] && data.questions[selectedSectionType].length > 0) {
+          setCurrentSection(selectedSectionType);
+          console.log(`📍 Single skill exam - Starting with ${selectedSectionType} section`);
+        } else {
+          Alert.alert('Thông báo', 'Kỹ năng này chưa có câu hỏi');
+          router.back();
+        }
       } else {
-        // No questions available
-        Alert.alert('Thông báo', 'Đề thi chưa có câu hỏi');
-        router.back();
+        // Auto-select first available section based on what teacher created
+        if (data.questions.listening && data.questions.listening.length > 0) {
+          setCurrentSection('listening');
+          console.log('📍 Starting with Listening section');
+        } else if (data.questions.reading && data.questions.reading.length > 0) {
+          setCurrentSection('reading');
+          console.log('📍 Starting with Reading section');
+        } else if (data.questions.writing && data.questions.writing.length > 0) {
+          setCurrentSection('writing');
+          console.log('📍 Starting with Writing section');
+        } else {
+          // No questions available
+          Alert.alert('Thông báo', 'Đề thi chưa có câu hỏi');
+          router.back();
+        }
       }
     } catch (error) {
       console.error('❌ Error loading exam:', error);
@@ -101,6 +133,16 @@ export default function PracticeExam() {
   // Get available sections based on what teacher created
   const getAvailableSections = (): Array<'listening' | 'reading' | 'writing'> => {
     if (!exam) return [];
+    
+    // If single skill exam, only return that section
+    if (isSingleSkillExam && selectedSectionType) {
+      if (exam.questions[selectedSectionType] && exam.questions[selectedSectionType].length > 0) {
+        return [selectedSectionType];
+      }
+      return [];
+    }
+    
+    // Otherwise return all available sections
     const sections: Array<'listening' | 'reading' | 'writing'> = [];
     
     if (exam.questions.listening && exam.questions.listening.length > 0) {
@@ -162,7 +204,8 @@ export default function PracticeExam() {
     index: currentQuestionIndex,
     hasQuestion: !!currentQuestion,
     questionType: currentQuestion?.type,
-    questionTitle: currentQuestion?.title
+    questionTitle: currentQuestion?.title,
+    questionData: currentQuestion
   });
 
   // Audio player handlers
@@ -239,13 +282,50 @@ export default function PracticeExam() {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Nộp bài',
-          onPress: () => {
-            calculateResults();
-            setShowResults(true);
+          onPress: async () => {
+            await submitExamResults();
           }
         }
       ]
     );
+  };
+
+  const submitExamResults = async () => {
+    if (!exam) return;
+
+    try {
+      // Calculate time spent
+      const timeSpent = timeRemaining !== null && sectionDuration
+        ? (sectionDuration * 60) - timeRemaining
+        : 0;
+
+      // Submit to backend
+      const result = await examService.submitExamResult({
+        examId: exam._id,
+        answers,
+        writingAnswers,
+        timeSpent,
+        isTrialMode,
+        sectionType: selectedSectionType || currentSection
+      });
+
+      console.log('✅ Exam submitted successfully:', result);
+
+      // Show success message
+      calculateResults();
+      setShowResults(true);
+
+    } catch (error) {
+      console.error('❌ Error submitting exam:', error);
+      Alert.alert(
+        'Lỗi',
+        'Không thể nộp bài. Vui lòng thử lại.',
+        [
+          { text: 'Thử lại', onPress: () => submitExamResults() },
+          { text: 'Hủy', style: 'cancel' }
+        ]
+      );
+    }
   };
 
   const calculateResults = () => {
@@ -278,17 +358,22 @@ export default function PracticeExam() {
     
     const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
     
+    // Calculate time taken
+    const timeTaken = timeRemaining !== null && sectionDuration
+      ? (sectionDuration * 60) - timeRemaining
+      : 0;
+    
     console.log('📊 Results:', {
       correctCount,
       totalCount,
       score,
-      timeElapsed: formatTime(timeElapsed)
+      timeTaken: formatTime(timeTaken)
     });
     
     // Show results screen
     Alert.alert(
       '🎉 Hoàn thành!',
-      `Điểm số: ${score}/100\nĐúng: ${correctCount}/${totalCount} câu\nThời gian: ${formatTime(timeElapsed)}`,
+      `Điểm số: ${score}/100\nĐúng: ${correctCount}/${totalCount} câu\nThời gian: ${formatTime(timeTaken)}`,
       [
         {
           text: 'Xem chi tiết',
@@ -365,15 +450,25 @@ export default function PracticeExam() {
         <View style={styles.headerCenter}>
           <Text style={styles.examTitle}>{exam.title}</Text>
           <Text style={styles.sectionTitle}>
+            {isSingleSkillExam ? '📌 ' : ''}
             {currentSection === 'listening' ? '🎧 Nghe' : 
              currentSection === 'reading' ? '📖 Đọc' : 
              currentSection === 'writing' ? '✍️ Viết' : '🎤 Nói'}
+            {isSingleSkillExam ? ' (Riêng lẻ)' : ''}
+            {isTrialMode ? ' - Thi thử' : ''}
           </Text>
         </View>
-        <View style={styles.timerContainer}>
-          <Clock size={20} color={COLORS.primaryGreen} />
-          <Text style={styles.timerText}>{formatTime(timeElapsed)}</Text>
-        </View>
+        {!isTrialMode && timeRemaining !== null && (
+          <View style={styles.timerContainer}>
+            <Clock size={20} color={timeRemaining < 300 ? COLORS.incorrectRed : COLORS.primaryGreen} />
+            <Text style={[
+              styles.timerText,
+              timeRemaining < 300 && { color: COLORS.incorrectRed }
+            ]}>
+              {formatTime(timeRemaining)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Progress Bar */}
@@ -528,22 +623,22 @@ export default function PracticeExam() {
           {/* ========== WRITING: Essay Input ========== */}
           {currentQuestion.type === 'writing' && (
             <>
-              {currentQuestion.prompt && (
-                <View style={styles.writingPrompt}>
-                  <Text style={styles.promptLabel}>✍️ Đề bài</Text>
+              <View style={styles.writingPrompt}>
+                <Text style={styles.promptLabel}>✍️ Đề bài</Text>
+                {currentQuestion.prompt && (
                   <Text style={styles.promptText}>{currentQuestion.prompt}</Text>
-                  {currentQuestion.instruction && (
-                    <Text style={styles.instructionText}>
-                      💡 Hướng dẫn: {currentQuestion.instruction}
-                    </Text>
-                  )}
-                  {currentQuestion.minWords && (
-                    <Text style={styles.wordCountHint}>
-                      📝 Tối thiểu: {currentQuestion.minWords} từ
-                    </Text>
-                  )}
-                </View>
-              )}
+                )}
+                {currentQuestion.instruction && (
+                  <Text style={styles.instructionText}>
+                    💡 Hướng dẫn: {currentQuestion.instruction}
+                  </Text>
+                )}
+                {currentQuestion.minWords && (
+                  <Text style={styles.wordCountHint}>
+                    📝 Tối thiểu: {currentQuestion.minWords} từ
+                  </Text>
+                )}
+              </View>
               
               <View style={styles.writingInputContainer}>
                 <Text style={styles.inputLabel}>Câu trả lời của bạn:</Text>

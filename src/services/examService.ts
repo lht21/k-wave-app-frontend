@@ -370,6 +370,26 @@ class ExamService {
     const url = `${API_BASE_URL}/exams/author/${authorId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return this.fetchWithAuth<Exam[]>(url);
   }
+
+  // ============ SUBMIT EXAM RESULTS ============
+
+  // POST: Submit exam results (for teacher review)
+  async submitExamResult(resultData: {
+    examId: string;
+    answers: { [key: string]: number };
+    writingAnswers: { [key: string]: string };
+    timeSpent: number;
+    isTrialMode?: boolean;
+    sectionType?: string;
+  }): Promise<{ message: string; resultId?: string }> {
+    return this.fetchWithAuth<{ message: string; resultId?: string }>(
+      `${API_BASE_URL}/exams/submit`,
+      {
+        method: 'POST',
+        body: JSON.stringify(resultData),
+      }
+    );
+  }
   
 }
 

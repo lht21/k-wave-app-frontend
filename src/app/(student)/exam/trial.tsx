@@ -12,44 +12,46 @@ import {
 import { useRouter } from 'expo-router';
 // Import icons từ phosphor-react-native
 import {
-  ExamIcon,
-  ArrowRightIcon,
-  WavesIcon,
+  Exam,
+  ArrowRight,
+  Waves,
+  Lightning,
 } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useExam } from '../../../hooks/useExam';
-import { Exam, ExamType } from '../../../services/examService';
+import { Exam as ExamType, ExamType as ExamTypeEnum } from '../../../services/examService';
 
 // Lấy chiều rộng màn hình để tính toán layout lưới
 const { width } = Dimensions.get('window');
 
 // Định nghĩa màu sắc theo thiết kế
 const COLORS = {
-  primaryGreen: '#00C853', // Màu xanh lá chủ đạo
+  primaryBlue: '#00C853', // Màu xanh dương chủ đạo cho thi thử
   textDark: '#1A1A1A', // Màu chữ đen
   textGray: '#666666', // Màu chữ xám phụ
   cardBg: '#F0F2F5', // Màu nền xám của các thẻ
-  iconBgGreen: '#E0F2E9', // Nền xanh nhạt cho icon
-  iconGreen: '#00C853', // Màu icon xanh
+  iconBgBlue: '#E3F2FD', // Nền xanh nhạt cho icon
+  iconBlue: '#00C853', // Màu icon xanh
   decorativeShape: '#E5E7EB', // Màu các mảng trang trí góc
   white: '#FFFFFF',
+  accentOrange: '#FF9800', // Màu nhấn cam cho "Thi thử"
 };
 
 // Exam type labels
-const examTypeLabels: { [key in ExamType]: string } = {
+const examTypeLabels: { [key in ExamTypeEnum]: string } = {
   topik1: 'TOPIK I',
   topik2: 'TOPIK II',
   esp: 'ESP',
 };
 
-export default function ExamsScreen() {
+export default function TrialExamsScreen() {
   const router = useRouter();
   const { loading, fetchExams } = useExam();
   
-  const [selectedType, setSelectedType] = useState<ExamType>('topik1');
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [selectedType, setSelectedType] = useState<ExamTypeEnum>('topik1');
+  const [exams, setExams] = useState<ExamType[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
+  const [featuredExams, setFeaturedExams] = useState<ExamType[]>([]);
 
   // Load exams when component mounts or type changes
   useEffect(() => {
@@ -76,15 +78,18 @@ export default function ExamsScreen() {
     }
   };
 
-  const handleStartExam = (examId: string, examTitle: string) => {
-    // Navigate to exam detail screen to choose skill
+  const handleStartTrialExam = (examId: string, examTitle: string) => {
+    // Navigate to exam detail screen to choose skill (trial mode)
     router.push({
       pathname: '/(student)/exam/exam-detail',
-      params: { examId }
+      params: { 
+        examId,
+        isTrialMode: 'true' // Flag to indicate trial mode (no timer)
+      }
     });
   };
 
-  const handleChangeExamType = (type: ExamType) => {
+  const handleChangeExamType = (type: ExamTypeEnum) => {
     setSelectedType(type);
   };
 
@@ -101,8 +106,8 @@ export default function ExamsScreen() {
   if (loading && exams.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primaryGreen} />
-        <Text style={styles.loadingText}>Đang tải đề thi...</Text>
+        <ActivityIndicator size="large" color={COLORS.primaryBlue} />
+        <Text style={styles.loadingText}>Đang tải đề thi thử...</Text>
       </View>
     );
   }
@@ -120,17 +125,23 @@ export default function ExamsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={loadExams}
-              colors={[COLORS.primaryGreen]}
-              tintColor={COLORS.primaryGreen}
+              colors={[COLORS.primaryBlue]}
+              tintColor={COLORS.primaryBlue}
             />
           }
         >
           {/* --- Header Title --- */}
-          <Text style={styles.mainHeaderTitle}>Luyện thi</Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.mainHeaderTitle}>Thi thử</Text>
+            <View style={styles.trialBadge}>
+              <Lightning size={16} color={COLORS.accentOrange} weight="fill" />
+              <Text style={styles.trialBadgeText}>Không giới hạn thời gian</Text>
+            </View>
+          </View>
 
           {/* Exam Type Tabs */}
           <View style={styles.typeTabsContainer}>
-            {(Object.keys(examTypeLabels) as ExamType[]).map((type) => (
+            {(Object.keys(examTypeLabels) as ExamTypeEnum[]).map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
@@ -155,7 +166,7 @@ export default function ExamsScreen() {
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Đề thi nổi bật</Text>
                 <TouchableOpacity>
-                  <ArrowRightIcon size={24} color={COLORS.textDark} />
+                  <ArrowRight size={24} color={COLORS.textDark} />
                 </TouchableOpacity>
               </View>
               
@@ -165,16 +176,19 @@ export default function ExamsScreen() {
                   key={exam._id} 
                   style={styles.featuredCard} 
                   activeOpacity={0.7}
-                  onPress={() => handleStartExam(exam._id, exam.title)}
+                  onPress={() => handleStartTrialExam(exam._id, exam.title)}
                 >
-                  <View style={styles.iconContainerGreen}>
-                    <ExamIcon size={24} color={COLORS.iconGreen} weight="fill" />
+                  <View style={styles.iconContainerBlue}>
+                    <Exam size={24} color={COLORS.iconBlue} weight="fill" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitleMedium}>{exam.title}</Text>
-                    {exam.isPremium && (
-                      <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
-                    )}
+                    <View style={styles.examMetaRow}>
+                      {exam.isPremium && (
+                        <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
+                      )}
+                      <Text style={styles.trialLabel}>🚀 Thi thử</Text>
+                    </View>
                   </View>
                   <DecorativeCorner isSmall={true} />
                 </TouchableOpacity>
@@ -184,11 +198,11 @@ export default function ExamsScreen() {
 
           {/* --- Section 3: Tất cả đề thi (All Exams) --- */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tất cả đề thi</Text>
+            <Text style={styles.sectionTitle}>Tất cả đề thi thử</Text>
             {exams.length === 0 ? (
               <View style={styles.emptyState}>
-                <ExamIcon size={48} color={COLORS.textGray} weight="thin" />
-                <Text style={styles.emptyText}>Chưa có đề thi nào</Text>
+                <Exam size={48} color={COLORS.textGray} weight="thin" />
+                <Text style={styles.emptyText}>Chưa có đề thi thử nào</Text>
               </View>
             ) : (
               <View style={styles.gridContainer}>
@@ -197,18 +211,19 @@ export default function ExamsScreen() {
                     key={exam._id} 
                     style={styles.levelCard} 
                     activeOpacity={0.7}
-                    onPress={() => handleStartExam(exam._id, exam.title)}
+                    onPress={() => handleStartTrialExam(exam._id, exam.title)}
                   >
                     <View style={styles.iconContainerGray}>
-                      <WavesIcon size={24} color={COLORS.iconGreen} weight="regular" />
+                      <Waves size={24} color={COLORS.iconBlue} weight="regular" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.cardTitleMedium} numberOfLines={2}>
                         {exam.title}
                       </Text>
                       <Text style={styles.examMeta}>
-                        {exam.totalQuestions || 0} câu • {exam.duration || 0} phút
+                        {exam.totalQuestions || 0} câu
                       </Text>
+                      <Text style={styles.trialLabel}>⚡ Không giới hạn</Text>
                     </View>
                     <DecorativeCorner isSmall={true} />
                   </TouchableOpacity>
@@ -248,23 +263,40 @@ const styles = StyleSheet.create({
       left: -Dimensions.get('window').width * 0.1,
       right: -Dimensions.get('window').width * 0.1,
       height: Dimensions.get('window').width * 0.8, // Chiều cao lớn
-      backgroundColor: '#F7F9FC', // Màu nền xám rất nhạt
+      backgroundColor: '#E3F2FD', // Màu nền xanh nhạt cho thi thử
       borderBottomLeftRadius: Dimensions.get('window').width, // Bo tròn cực lớn để tạo đường cong
       borderBottomRightRadius: Dimensions.get('window').width,
       transform: [{ scaleX: 1.2 }], // Kéo dãn để đường cong thoai thoải hơn
   },
   safeArea: {
     flex: 1,
-    
   },
   scrollContent: {
     padding: 20,
   },
+  headerTitleContainer: {
+    marginBottom: 20,
+  },
   mainHeaderTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.primaryGreen,
-    marginBottom: 20,
+    color: COLORS.primaryBlue,
+    marginBottom: 8,
+  },
+  trialBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  trialBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.accentOrange,
   },
   // Exam Type Tabs
   typeTabsContainer: {
@@ -283,8 +315,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   activeTypeTab: {
-    backgroundColor: COLORS.primaryGreen + '15',
-    borderColor: COLORS.primaryGreen,
+    backgroundColor: COLORS.primaryBlue + '15',
+    borderColor: COLORS.primaryBlue,
   },
   typeTabText: {
     fontSize: 13,
@@ -292,7 +324,7 @@ const styles = StyleSheet.create({
     color: COLORS.textGray,
   },
   activeTypeTabText: {
-    color: COLORS.primaryGreen,
+    color: COLORS.primaryBlue,
     fontWeight: '700',
   },
   section: {
@@ -312,10 +344,10 @@ const styles = StyleSheet.create({
   },
 
   // --- Styles chung cho Icon Container ---
-  iconContainerGreen: {
+  iconContainerBlue: {
     width: 50,
     height: 50,
-    backgroundColor: COLORS.iconBgGreen,
+    backgroundColor: COLORS.iconBgBlue,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -342,11 +374,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
   },
+  examMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
   premiumBadgeText: {
     fontSize: 10,
-    color: COLORS.primaryGreen,
+    color: COLORS.primaryBlue,
     fontWeight: '600',
-    marginTop: 4,
+  },
+  trialLabel: {
+    fontSize: 10,
+    color: COLORS.accentOrange,
+    fontWeight: '700',
   },
   examMeta: {
     fontSize: 11,

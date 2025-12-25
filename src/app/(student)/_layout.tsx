@@ -25,6 +25,8 @@ export default function StudentLayout() {
       <Stack.Screen name="exam/index" options={{ headerShown: false }} />
       <Stack.Screen name="exam/practice" options={{ headerShown: false }} />
       <Stack.Screen name="exam/real" options={{ headerShown: false }} />
+      <Stack.Screen name="exam/trial" options={{ headerShown: false }} />
+      <Stack.Screen name="exam/exam-detail" options={{ headerShown: false }} />
       <Stack.Screen name="exam/taking" options={{ headerShown: false, gestureEnabled: false }} />
 
       {/* Nhóm Culture */}

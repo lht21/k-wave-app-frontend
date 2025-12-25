@@ -17,7 +17,7 @@ const HomeStd: React.FC = () => {
   // Giữ nguyên Logic Data
   const learningModules = [
     { id: '1', title: 'Lộ trình', icon: '🛣️', navigateTo: '/(student)/roadmap/roadmap' },
-    { id: '2', title: 'Thi thử', icon: '🎯', navigateTo: '/(student)/exam/practice' },
+    { id: '2', title: 'Thi thử', icon: '🎯', navigateTo: '/(student)/exam/trial' },
     { id: '3', title: 'Luyện thi', icon: '⏰', navigateTo: '/(student)/exam/real' },
     { id: '4', title: 'Video', icon: '🎥', navigateTo: '/(student)/video/learning' },
     { id: '5', title: 'Văn hoá', icon: '🏛️', navigateTo: '/(student)/culture/culture-list' },
