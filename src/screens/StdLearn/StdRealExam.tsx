@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -10,10 +10,8 @@ import { mockExamTypes, mockExamSets } from '../../data/mockExamData';
 import { ExamType, ExamSet } from '../../types/exam';
 import ExamModeComparison from '../../components/ExamModeComparison';
 
-type StdRealExamNavigationProp = StackNavigationProp<RootStackParamList>;
-
 const StdRealExam: React.FC = () => {
-  const navigation = useNavigation<StdRealExamNavigationProp>();
+  const router = useRouter();
   const [selectedExamType, setSelectedExamType] = useState<ExamType | null>(null);
 
   // Filter exam sets for real mode
@@ -42,12 +40,14 @@ const StdRealExam: React.FC = () => {
           text: 'Bắt đầu',
           style: 'default',
           onPress: () => {
-            navigation.navigate('StdExamTaking', {
-              examId: examSet.id,
-              examType: 'real',
-              examTitle: `${selectedExamType?.title} - ${examSet.title} (Thi thật)`,
-              timeLimit: examSet.timeLimit,
-              questions: []
+            router.push({
+              pathname: '/(student)/exam/taking',
+              params: {
+                examId: examSet.id,
+                examType: 'real',
+                examTitle: `${selectedExamType?.title} - ${examSet.title} (Thi thật)`,
+                timeLimit: examSet.timeLimit?.toString() || '60'
+              }
             });
           }
         }
@@ -133,18 +133,22 @@ const StdRealExam: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thi thật</Text>
-        <View style={styles.realIndicator}>
-          <Text style={styles.realIndicatorText}>⏰</Text>
-        </View>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Thi thật</Text>
+            <View style={styles.realIndicator}>
+              <Text style={styles.realIndicatorText}>⏰</Text>
+            </View>
+          </View>
+        </SafeAreaView>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -245,20 +249,21 @@ const StdRealExam: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#fff'
   },
 
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
-    backgroundColor: '#269a56ff', // Green for consistency with app theme
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20
+    marginTop: 10,
   },
   backButton: {
     width: 40,
@@ -269,14 +274,16 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   backButtonText: {
-    fontSize: 20,
-    color: palette.white,
-    fontWeight: '600'
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold'
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: '700',
-    color: palette.white
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   realIndicator: {
     width: 40,

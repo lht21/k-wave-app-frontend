@@ -4,23 +4,23 @@ import {
   Text, 
   StyleSheet, 
   ScrollView, 
-  SafeAreaView, 
   TouchableOpacity, 
   Image,
   Dimensions,
   Share,
   ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { spacing } from '../theme/spacing';
-import { colors, palette } from '../theme/colors';
-import { typography } from '../theme/typography';
-import ClickableText from '../components/ClickableText';
-import WordPopup from '../components/WordPopup';
-import { useWordPopup } from '../hooks/useWordPopup'
-import { getNewsById, getRelatedNews } from '../services/newsApiService'
-import { NewsArticle } from '../types/news'
-import { useFavoriteNews } from '../contexts/FavoriteNewsContext'
+import { spacing } from '../../../theme/spacing';
+import { colors, palette } from '../../../theme/colors';
+import { typography } from '../../../theme/typography';
+import ClickableText from '../../../components/ClickableText';
+import WordPopup from '../../../components/WordPopup';
+import { useWordPopup } from '../../../hooks/useWordPopup'
+import { getNewsById, getRelatedNews } from '../../../services/newsApiService'
+import { NewsArticle } from '../../../types/news'
+import { useFavoriteNews } from '../../../contexts/FavoriteNewsContext'
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -29,10 +29,60 @@ const NewsDetail: React.FC = () => {
   const params = useLocalSearchParams();
   const newsId = params.newsId as string;
   
-  const [article, setArticle] = useState<any>(null) // Use any to handle API response
-  const [relatedArticles, setRelatedArticles] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Dữ liệu bài viết cố định
+  const [article] = useState<any>({
+    id: 'news-001',
+    title: 'K-POP이 세계를 사로잡다: BTS와 블랙핑크의 글로벌 영향력',
+    subtitle: 'K-POP이 어떻게 전 세계 음악 시장을 변화시키고 있는지 알아봅니다',
+    content: `K-POP은 이제 단순한 음악 장르를 넘어 글로벌 문화 현상이 되었습니다. BTS와 블랙핑크를 중심으로 한 한국 아이돌 그룹들은 전 세계 팬들의 마음을 사로잡고 있습니다.
+
+BTS는 2013년 데뷔 이후 빌보드 차트를 석권하며 한국 가수 최초로 그래미 어워드에 노미네이트되는 쾌거를 이뤘습니다. 그들의 음악은 청춘의 고뇌와 사회적 메시지를 담아 전 세계 젊은이들에게 깊은 울림을 주고 있습니다.
+
+블랙핑크 역시 강렬한 퍼포먼스와 독특한 음악 스타일로 전 세계 여성 팬들의 아이콘이 되었습니다. 그들의 뮤직비디오는 유튜브에서 수억 뷰를 기록하며 K-POP의 위상을 높이고 있습니다.
+
+K-POP의 성공 비결은 체계적인 연습생 시스템, 높은 퀄리티의 뮤직비디오, 그리고 SNS를 통한 적극적인 팬 소통에 있습니다. 이러한 요소들이 결합되어 K-POP은 전 세계 음악 시장에서 독보적인 위치를 차지하게 되었습니다.
+
+앞으로도 K-POP은 계속해서 진화하며 더 많은 글로벌 팬들을 만나게 될 것입니다. 한국의 음악과 문화가 세계를 하나로 연결하는 다리 역할을 하고 있습니다.`,
+    author: '김한글',
+    publishedDate: '2025-12-25',
+    source: 'K-Wave News',
+    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
+    category: 'music',
+    tags: ['K-POP', 'BTS', '블랙핑크', '한류', '음악'],
+    readingTime: 5,
+    difficulty: 'intermediate',
+    keywords: ['사로잡다', '영향력', '석권하다', '노미네이트', '퍼포먼스']
+  });
+  
+  const [relatedArticles] = useState<any[]>([
+    {
+      id: 'news-002',
+      title: '한국 드라마의 세계적 인기, 넷플릭스가 주목하다',
+      subtitle: '오징어 게임의 성공 이후 한국 드라마의 위상',
+      imageUrl: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400',
+      source: 'Drama Weekly',
+      publishedDate: '2025-12-20'
+    },
+    {
+      id: 'news-003',
+      title: '한식의 세계화: 김치와 비빔밥이 글로벌 푸드가 되다',
+      subtitle: '한식당이 미슐랭 스타를 받으며 인정받는 한국의 맛',
+      imageUrl: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400',
+      source: 'Food Culture',
+      publishedDate: '2025-12-18'
+    },
+    {
+      id: 'news-004',
+      title: '한국 영화의 르네상스: 봉준호 감독의 아카데미 수상',
+      subtitle: '기생충이 보여준 한국 영화의 예술성과 메시지',
+      imageUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400',
+      source: 'Cinema Review',
+      publishedDate: '2025-12-15'
+    }
+  ]);
+  
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
   
   // Favorite functionality
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavoriteNews()
@@ -40,55 +90,6 @@ const NewsDetail: React.FC = () => {
   
   // Word popup functionality
   const { wordInfo, popupVisible, popupPosition, handleWordPress, closePopup } = useWordPopup();
-
-  useEffect(() => {
-    const fetchArticle = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        
-        console.log('Fetching article with ID:', newsId)
-        
-        // Fetch main article
-        const articleResponse = await getNewsById(newsId)
-        
-        if (articleResponse.success && articleResponse.data) {
-          setArticle(articleResponse.data)
-          console.log('Article fetched successfully:', articleResponse.data.title)
-          
-          // Try to fetch related articles, but don't fail if it doesn't work
-          try {
-            const relatedResponse = await getRelatedNews(newsId, 3)
-            if (relatedResponse.success && relatedResponse.data) {
-              setRelatedArticles(relatedResponse.data)
-              console.log('Related articles fetched:', relatedResponse.data.length)
-            } else {
-              console.log('No related articles found, using empty array')
-              setRelatedArticles([])
-            }
-          } catch (relatedError) {
-            console.log('Failed to fetch related articles:', relatedError)
-            setRelatedArticles([]) // Set empty array if related articles fail
-          }
-        } else {
-          console.log('Failed to fetch article, using mock data')
-          // Article fetch failed, but we have mock data fallback in the API service
-          if (articleResponse.data) {
-            setArticle(articleResponse.data)
-          } else {
-            setError('기사를 불러오는데 실패했습니다')
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching article:', err)
-        setError('네트워크 오류가 발생했습니다')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchArticle()
-  }, [newsId]);
 
   const handleShare = async () => {
     if (!article) return;
@@ -154,57 +155,59 @@ const NewsDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#269a56ff" />
           <Text style={styles.loadingText}>기사를 불러오는 중...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
   if (error && !article) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>돌아가기</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
   // Show article even if there was an error (fallback data)
   if (!article) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>기사를 찾을 수 없습니다</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>돌아가기</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-          <Text style={styles.headerButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>뉴스 상세</Text>
-        </View>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
+              <Text style={styles.headerButtonText}>←</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle} numberOfLines={1}>뉴스 상세</Text>
 
-        <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-          <Text style={styles.headerButtonText}>📤</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
+              <Text style={styles.headerButtonText}>📤</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -297,7 +300,7 @@ const NewsDetail: React.FC = () => {
                 key={relatedArticle.id}
                 style={styles.relatedCard}
                 onPress={() => router.push({
-                  pathname: '/(student)/news-detail',
+                  pathname: '/(student)/news/[id]',
                   params: {
                     newsId: relatedArticle.id, 
                     title: relatedArticle.title || '제목 없음'
@@ -333,27 +336,28 @@ const NewsDetail: React.FC = () => {
         wordInfo={wordInfo}
         position={popupPosition}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#fff',
   },
   
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    paddingTop: 25, // Match exam page header positioning
-    backgroundColor: '#269a56ff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    marginTop: 10,
   },
   headerButton: {
     width: 40,
@@ -364,19 +368,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerButtonText: {
-    fontSize: 18,
-    color: palette.white,
-    fontWeight: '600',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: spacing.md,
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: palette.white,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
 
   // Content

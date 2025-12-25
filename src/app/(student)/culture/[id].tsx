@@ -5,17 +5,14 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../../../theme/spacing';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-import { RootStackParamList } from '../../../types/navigation';
 import CultureApiService from '../../../services/cultureApiService';
 
 interface CultureItem {
@@ -42,20 +39,19 @@ interface CultureItem {
   isPublished?: boolean;
 }
 
-type CultureDetailNavigationProp = StackNavigationProp<RootStackParamList>;
-type CultureDetailRouteProp = RouteProp<any, 'StdCultureDetail'>;
-
 const StdCultureDetail: React.FC = () => {
-  const navigation = useNavigation<CultureDetailNavigationProp>();
-  const route = useRoute<CultureDetailRouteProp>();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   
-  const { itemId } = route.params as { itemId: string; itemTitle: string };
+  const itemId = params.id as string;
   const [item, setItem] = useState<CultureItem | null>(null);
   const [relatedItems, setRelatedItems] = useState<CultureItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCultureItem();
+    if (itemId) {
+      loadCultureItem();
+    }
   }, [itemId]);
 
   const loadCultureItem = async () => {
@@ -70,8 +66,8 @@ const StdCultureDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading culture item:', error);
-      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa');
-      navigation.goBack();
+      Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa. Vui lòng kiểm tra kết nối mạng.');
+      router.back();
     } finally {
       setLoading(false);
     }
@@ -116,7 +112,7 @@ const StdCultureDetail: React.FC = () => {
             <Text style={styles.errorText}>Không tìm thấy nội dung!</Text>
             <TouchableOpacity 
               style={styles.backToListButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => router.back()}
             >
               <Text style={styles.backToListText}>Quay lại</Text>
             </TouchableOpacity>
@@ -191,11 +187,11 @@ const StdCultureDetail: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{item?.title || 'Chi tiết'}</Text>
         <TouchableOpacity style={styles.shareButton}>
           <Text style={styles.shareButtonText}>📤</Text>
         </TouchableOpacity>
@@ -231,9 +227,12 @@ const StdCultureDetail: React.FC = () => {
               <TouchableOpacity
                 key={relatedItem._id}
                 style={styles.relatedItem}
-                onPress={() => navigation.push('StdCultureDetail' as any, { 
-                  itemId: relatedItem._id,
-                  itemTitle: relatedItem.title 
+                onPress={() => router.push({
+                  pathname: '/(student)/culture/[id]',
+                  params: { 
+                    id: relatedItem._id,
+                    itemTitle: relatedItem.title 
+                  }
                 })}
               >
                 <Text style={styles.relatedItemTitle}>{relatedItem.title}</Text>
