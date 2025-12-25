@@ -22,21 +22,21 @@ export default function StudentLayout() {
       <Stack.Screen name="skill-practice" options={{ headerShown: false }} />
       
       {/* Nhóm Exam - Nested trong folder exam/ */}
+      <Stack.Screen name="exam/index" options={{ headerShown: false }} />
       <Stack.Screen name="exam/practice" options={{ headerShown: false }} />
       <Stack.Screen name="exam/real" options={{ headerShown: false }} />
       <Stack.Screen name="exam/taking" options={{ headerShown: false, gestureEnabled: false }} />
-      <Stack.Screen name="exam-selector" options={{ headerShown: false }} />
 
       {/* Nhóm Culture */}
-      <Stack.Screen name="culture" options={{ headerShown: false }} />
+      <Stack.Screen name="culture/culture-list" options={{ headerShown: false }} />
       <Stack.Screen name="culture/[id]" options={{ headerShown: false }} />
 
       {/* Nhóm News & Video */}
       <Stack.Screen name="news/news" options={{ headerShown: false }} />
-      <Stack.Screen name="news-detail" options={{ headerShown: false }} />
-      <Stack.Screen name="video-learning" options={{ headerShown: false }} />
-      <Stack.Screen name="video-category" options={{ headerShown: false }} />
-      <Stack.Screen name="video-detail" options={{ headerShown: false }} />
+      <Stack.Screen name="news/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="video/index" options={{ headerShown: false }} />
+      <Stack.Screen name="video/learning" options={{ headerShown: false }} />
+      <Stack.Screen name="video/[id]" options={{ headerShown: false }} />
 
       {/* Premium */}
       <Stack.Screen name="premium/update" options={{ headerShown: false }} />

@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { spacing } from '../../theme/spacing';
-import { colors, palette } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import CultureApiService from '../../services/cultureApiService';
+import { spacing } from '../../../theme/spacing';
+import { colors, palette } from '../../../theme/colors';
+import { typography } from '../../../theme/typography';
+import CultureApiService from '../../../services/cultureApiService';
 
 interface CultureCategory {
   id: string;
@@ -204,19 +204,23 @@ const StdCulture: React.FC = () => {
     : cultureItems;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Header Profile Style */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Văn hóa</Text>
-        <TouchableOpacity style={styles.infoButton}>
-          <Text style={styles.infoButtonText}>ℹ️</Text>
-        </TouchableOpacity>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Văn hóa</Text>
+            <TouchableOpacity style={styles.infoButton}>
+              <Text style={styles.infoButtonText}>ℹ️</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
 
       {/* Category Tabs */}
@@ -260,27 +264,28 @@ const StdCulture: React.FC = () => {
           />
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#fff'
   },
 
-  // Header
+  // Header Profile Style
   header: {
+    backgroundColor: '#00D95F',
+    borderBottomRightRadius: 40,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl, // Match exam page header positioning
-    backgroundColor: '#269a56ff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20
+    marginTop: 10,
   },
   backButton: {
     width: 40,
@@ -291,14 +296,16 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   backButtonText: {
-    fontSize: 20,
-    color: palette.white,
-    fontWeight: '600'
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold'
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: '700',
-    color: palette.white
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   infoButton: {
     width: 40,
@@ -310,7 +317,7 @@ const styles = StyleSheet.create({
   },
   infoButtonText: {
     fontSize: 16,
-    color: palette.white
+    color: '#fff'
   },
 
   // Category Tabs

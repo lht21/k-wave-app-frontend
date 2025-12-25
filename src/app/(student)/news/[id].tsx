@@ -1,5 +1,5 @@
 import React from 'react';
-import NewsDetail from '../../screens/StdNewsDetail';
+import NewsDetail from './news-detail';
 
 export default function NewsDetailScreen() {
   return <NewsDetail />;

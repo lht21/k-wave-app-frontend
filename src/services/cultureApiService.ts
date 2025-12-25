@@ -1,5 +1,5 @@
 // API service for Culture
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+import API_BASE_URL from '../api/api';
 
 interface CultureItemsParams {
     categoryId?: string;
@@ -25,15 +25,24 @@ class CultureApiService {
     // Lấy danh sách categories
     static async getCategories() {
         try {
-            const response = await fetch(`${BASE_URL}/culture/categories`);
+            const url = `${API_BASE_URL}/culture/categories`;
+            console.log('📥 Fetching categories from:', url);
+            
+            const response = await fetch(url);
+            console.log('📥 Response status:', response.status);
+            
             const data = await response.json();
+            console.log('📥 Response data:', JSON.stringify(data, null, 2));
             
             if (data.success) {
+                console.log('✅ Categories loaded:', data.data?.length || 0, 'categories');
                 return data.data;
             }
+            
+            console.error('❌ API returned success=false:', data.message);
             throw new Error(data.message || 'Lỗi khi lấy danh sách categories');
         } catch (error) {
-            console.error('Error fetching categories:', error);
+            console.error('❌ Error fetching categories:', error);
             throw error;
         }
     }
@@ -48,15 +57,24 @@ class CultureApiService {
             if (params.limit) queryParams.append('limit', params.limit.toString());
             if (params.search) queryParams.append('search', params.search);
 
-            const response = await fetch(`${BASE_URL}/culture/items?${queryParams}`);
+            const url = `${API_BASE_URL}/culture/items?${queryParams}`;
+            console.log('📥 Fetching culture items from:', url);
+            
+            const response = await fetch(url);
+            console.log('📥 Response status:', response.status);
+            
             const data = await response.json();
+            console.log('📥 Response data:', JSON.stringify(data, null, 2));
             
             if (data.success) {
+                console.log('✅ Culture items loaded:', data.data?.items?.length || 0, 'items');
                 return data.data;
             }
+            
+            console.error('❌ API returned success=false:', data.message);
             throw new Error(data.message || 'Lỗi khi lấy danh sách nội dung văn hóa');
         } catch (error) {
-            console.error('Error fetching culture items:', error);
+            console.error('❌ Error fetching culture items:', error);
             throw error;
         }
     }
@@ -64,15 +82,24 @@ class CultureApiService {
     // Lấy chi tiết culture item
     static async getCultureItem(id: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/items/${id}`);
+            console.log('📥 Fetching culture item with ID:', id);
+            console.log('📥 URL:', `${API_BASE_URL}/culture/items/${id}`);
+            
+            const response = await fetch(`${API_BASE_URL}/culture/items/${id}`);
+            console.log('📥 Response status:', response.status);
+            
             const data = await response.json();
+            console.log('📥 Response data:', JSON.stringify(data, null, 2));
             
             if (data.success) {
+                console.log('✅ Culture item loaded successfully');
                 return data.data;
             }
+            
+            console.error('❌ API returned success=false:', data.message);
             throw new Error(data.message || 'Lỗi khi lấy chi tiết nội dung');
         } catch (error) {
-            console.error('Error fetching culture item:', error);
+            console.error('❌ Error fetching culture item:', error);
             throw error;
         }
     }
@@ -80,7 +107,7 @@ class CultureApiService {
     // Tạo culture item mới (teacher)
     static async createCultureItem(itemData: any, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/items`, {
+            const response = await fetch(`${API_BASE_URL}/culture/items`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -104,7 +131,7 @@ class CultureApiService {
     // Cập nhật culture item (teacher)
     static async updateCultureItem(id: string, itemData: any, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/items/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/culture/items/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -128,7 +155,7 @@ class CultureApiService {
     // Gửi để duyệt (teacher)
     static async submitForApproval(id: string, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/items/${id}/submit`, {
+            const response = await fetch(`${API_BASE_URL}/culture/items/${id}/submit`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -156,7 +183,7 @@ class CultureApiService {
             if (params.page) queryParams.append('page', params.page.toString());
             if (params.limit) queryParams.append('limit', params.limit.toString());
 
-            const response = await fetch(`${BASE_URL}/culture/my-items?${queryParams}`, {
+            const response = await fetch(`${API_BASE_URL}/culture/my-items?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -177,7 +204,7 @@ class CultureApiService {
     // Xóa culture item (teacher)
     static async deleteCultureItem(id: string, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/items/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/culture/items/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -208,7 +235,7 @@ class CultureApiService {
             if (params.limit) queryParams.append('limit', params.limit.toString());
             if (params.search) queryParams.append('search', params.search);
 
-            const response = await fetch(`${BASE_URL}/culture/admin/items?${queryParams}`, {
+            const response = await fetch(`${API_BASE_URL}/culture/admin/items?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -229,7 +256,7 @@ class CultureApiService {
     // Duyệt culture item (admin)
     static async approveCultureItem(id: string, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/admin/items/${id}/approve`, {
+            const response = await fetch(`${API_BASE_URL}/culture/admin/items/${id}/approve`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -251,7 +278,7 @@ class CultureApiService {
     // Từ chối culture item (admin)
     static async rejectCultureItem(id: string, rejectionReason: string, token: string) {
         try {
-            const response = await fetch(`${BASE_URL}/culture/admin/items/${id}/reject`, {
+            const response = await fetch(`${API_BASE_URL}/culture/admin/items/${id}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
