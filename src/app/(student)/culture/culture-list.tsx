@@ -14,9 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from '../../../theme/spacing';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
-import CultureApiService from '../../../services/cultureApiService';
+import { cultureService } from '../../../services/cultureService';
 
+// Định nghĩa interface phù hợp với cultureService
 interface CultureCategory {
+  _id?: string;
   id: string;
   title: string;
   description: string;
@@ -28,71 +30,80 @@ interface CultureItem {
   title: string;
   subtitle?: string;
   description: string;
-  category: {
-    id: string;
-    title: string;
-  };
+  category: string; // cultureService dùng string thay vì object
   tags?: string[];
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
-  viewCount: number;
-  author: {
-    fullName: string;
-  };
+  views?: number; // cultureService dùng views thay vì viewCount
+  author?: any;
+  image?: string;
+  isPremium?: boolean;
+  likes?: number;
 }
 
 const StdCulture: React.FC = () => {
   const router = useRouter();
-  const [categories, setCategories] = useState<CultureCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<CultureCategory | null>(null);
+  const [categories, setCategories] = useState<CultureCategory[]>([
+    { id: 'Tất cả', title: 'Tất cả',description: ''},
+    { id: 'Âm nhạc', title: 'Âm nhạc',description: '', icon: '🎵' },
+    { id: 'Ẩm thực', title: 'Ẩm thực',description: '', icon: '🍳' },
+    { id: 'Du lịch', title: 'Du lịch',description: '', icon: '🛩️' },
+    { id: 'Điện ảnh', title: 'Điện ảnh',description: '', icon: '📽️' },
+    { id: 'Làm đẹp', title: 'Làm đẹp',description: '', icon: '💅🏻' },
+    { id: 'Lễ hội', title: 'Lễ hội',description: '', icon: '🎎' },
+    { id: 'Lịch sử', title: 'Lịch sử',description: '', icon: '🏯' },
+    { id: 'Trang phục', title: 'Trang phục',description: '', icon: '👜' },
+    { id: 'Trường học', title: 'Trường học',description: '', icon: '🎓' },
+    { id: 'Uống rượu', title: 'Uống rượu',description: '', icon: '🥂' },
+    { id: 'Ứng xử', title: 'Ứng xử',description: '', icon: '🤝🏻' }
+
+  ]);
+  
+
+  const [selectedCategory, setSelectedCategory] = useState<CultureCategory>(categories[0]);
   const [cultureItems, setCultureItems] = useState<CultureItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
 
-  // Load categories khi component mount
+  // Load culture items khi component mount và khi category thay đổi
   useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Load culture items khi category thay đổi
-  useEffect(() => {
-    if (selectedCategory) {
-      loadCultureItems();
-    }
+    loadCultureItems();
   }, [selectedCategory]);
 
-  const loadCategories = async () => {
-    try {
-      setLoading(true);
-      const categoriesData = await CultureApiService.getCategories();
-      setCategories(categoriesData);
-      
-      // Chọn category đầu tiên làm mặc định
-      if (categoriesData.length > 0) {
-        setSelectedCategory(categoriesData[0]);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách chủ đề. Vui lòng kiểm tra kết nối mạng.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadCultureItems = async () => {
-    if (!selectedCategory) return;
-
     try {
       setItemsLoading(true);
-      const response = await CultureApiService.getCultureItems({
-        categoryId: selectedCategory.id,
-        limit: 20
-      });
-      setCultureItems(response.items || []);
+      
+      // Gọi cultureService.getAll() với category (nếu không phải 'all')
+      const categoryParam = selectedCategory.id === 'all' ? undefined : selectedCategory.title;
+      
+      console.log('🔄 Loading culture items for category:', categoryParam);
+      
+      const response = await cultureService.getAll(categoryParam);
+      
+      console.log('📊 Culture items response:', response);
+      
+      // Chuyển đổi dữ liệu từ cultureService sang format phù hợp
+      const items: CultureItem[] = response.map((item: any) => ({
+        _id: item._id,
+        title: item.title,
+        subtitle: item.subtitle || '',
+        description: item.content?.[0]?.content || item.description || 'Không có mô tả',
+        category: item.category || 'Không xác định',
+        views: item.views || 0,
+        author: item.author || { fullName: 'Admin' },
+        image: item.image,
+        isPremium: item.isPremium || false,
+        likes: item.likes || 0
+      }));
+      
+      setCultureItems(items);
     } catch (error) {
-      console.error('Error loading culture items:', error);
+      console.error('❌ Error loading culture items:', error);
       Alert.alert('Lỗi', 'Không thể tải nội dung văn hóa. Vui lòng thử lại.');
+      setCultureItems([]);
     } finally {
       setItemsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -108,6 +119,10 @@ const StdCulture: React.FC = () => {
         itemTitle: item.title 
       }
     });
+  };
+
+  const handleRefresh = () => {
+    loadCultureItems();
   };
 
   if (loading) {
@@ -140,15 +155,29 @@ const StdCulture: React.FC = () => {
 
   const CultureItemCard = ({ item }: { item: CultureItem }) => (
     <TouchableOpacity
-      style={styles.itemCard}
+      style={[
+        styles.itemCard,
+        item.isPremium && styles.premiumItemCard
+      ]}
       onPress={() => handleItemPress(item)}
     >
       <View style={styles.itemContent}>
         <View style={styles.itemHeader}>
           <View style={styles.itemIconContainer}>
-            <Text style={styles.itemIcon}>🌸</Text>
+            {item.isPremium ? (
+              <Text style={styles.premiumIcon}>⭐</Text>
+            ) : (
+              <Text style={styles.itemIcon}>🌸</Text>
+            )}
           </View>
-          <Text style={styles.itemTitle}>{item.title}</Text>
+          <View style={styles.itemTitleContainer}>
+            <Text style={styles.itemTitle}>{item.title}</Text>
+            {item.isPremium && (
+              <View style={styles.premiumBadge}>
+                <Text style={styles.premiumBadgeText}>Premium</Text>
+              </View>
+            )}
+          </View>
         </View>
         
         {item.subtitle && (
@@ -160,27 +189,19 @@ const StdCulture: React.FC = () => {
         </Text>
         
         <View style={styles.itemMeta}>
-          <Text style={styles.itemAuthor}>Bởi {item.author.fullName}</Text>
-          <Text style={styles.itemViews}>{item.viewCount} lượt xem</Text>
+          <Text style={styles.itemCategory}>Chủ đề: {item.category}</Text>
+          <Text style={styles.itemViews}>{item.views || 0} lượt xem</Text>
         </View>
         
-        {item.tags && item.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {item.tags.slice(0, 2).map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-            {item.difficulty && (
-              <View style={[styles.tag, styles.difficultyTag]}>
-                <Text style={styles.tagText}>
-                  {item.difficulty === 'beginner' ? 'Cơ bản' :
-                   item.difficulty === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
-                </Text>
-              </View>
-            )}
+        <View style={styles.itemStats}>
+          <Text style={styles.itemAuthor}>
+            {item.author?.fullName || 'Admin'}
+          </Text>
+          <View style={styles.likesContainer}>
+            <Text style={styles.likesIcon}>❤️</Text>
+            <Text style={styles.likesCount}>{item.likes || 0}</Text>
           </View>
-        )}
+        </View>
       </View>
       
       <View style={styles.itemArrow}>
@@ -194,14 +215,15 @@ const StdCulture: React.FC = () => {
       <Text style={styles.emptyStateIcon}>📚</Text>
       <Text style={styles.emptyStateTitle}>Chưa có nội dung</Text>
       <Text style={styles.emptyStateDescription}>
-        Nội dung cho chủ đề này sẽ được cập nhật sớm
+        {selectedCategory.id === 'all' 
+          ? 'Hiện chưa có nội dung văn hóa nào.' 
+          : `Chưa có nội dung cho chủ đề "${selectedCategory.title}".`}
       </Text>
+      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+        <Text style={styles.refreshButtonText}>⟳ Thử lại</Text>
+      </TouchableOpacity>
     </View>
   );
-
-  const filteredItems = selectedCategory?.id === 'all' 
-    ? cultureItems 
-    : cultureItems;
 
   return (
     <View style={styles.container}>
@@ -215,9 +237,12 @@ const StdCulture: React.FC = () => {
             >
               <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Văn hóa</Text>
-            <TouchableOpacity style={styles.infoButton}>
-              <Text style={styles.infoButtonText}>ℹ️</Text>
+            <Text style={styles.headerTitle}>Văn hóa Hàn Quốc</Text>
+            <TouchableOpacity 
+              style={styles.refreshHeaderButton}
+              onPress={handleRefresh}
+            >
+              <Text style={styles.refreshHeaderButtonText}>⟳</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -225,6 +250,7 @@ const StdCulture: React.FC = () => {
 
       {/* Category Tabs */}
       <View style={styles.categorySection}>
+        <Text style={styles.categorySectionTitle}>Chủ đề</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -236,18 +262,41 @@ const StdCulture: React.FC = () => {
         </ScrollView>
       </View>
 
-      {/* Selected Category Info */}
-      {selectedCategory && (
-        <View style={styles.categoryInfoSection}>
-          <Text style={styles.categoryInfoTitle}>{selectedCategory.title}</Text>
-          <Text style={styles.categoryInfoDescription}>
-            {selectedCategory.description}
-          </Text>
+      {/* Stats Overview */}
+      <View style={styles.statsOverview}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{cultureItems.length}</Text>
+          <Text style={styles.statLabel}>Bài viết</Text>
         </View>
-      )}
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>
+            {cultureItems.reduce((sum, item) => sum + (item.views || 0), 0)}
+          </Text>
+          <Text style={styles.statLabel}>Lượt xem</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>
+            {cultureItems.reduce((sum, item) => sum + (item.likes || 0), 0)}
+          </Text>
+          <Text style={styles.statLabel}>Lượt thích</Text>
+        </View>
+      </View>
 
       {/* Culture Items */}
       <View style={styles.itemsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory.id === 'all' 
+              ? 'Tất cả bài viết' 
+              : selectedCategory.title}
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            {cultureItems.length} bài viết
+          </Text>
+        </View>
+        
         {itemsLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#269a56ff" />
@@ -261,6 +310,7 @@ const StdCulture: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.itemsList}
             ListEmptyComponent={renderEmptyState}
+            refreshControl={undefined} // Bỏ qua warning refreshControl
           />
         )}
       </View>
@@ -271,7 +321,7 @@ const StdCulture: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff'
+    backgroundColor: '#F8F9FA'
   },
 
   // Header Profile Style
@@ -301,13 +351,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
   },
-  infoButton: {
+  refreshHeaderButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -315,17 +365,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  infoButtonText: {
-    fontSize: 16,
-    color: '#fff'
+  refreshHeaderButtonText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '600'
   },
 
-  // Category Tabs
+  // Category Section
   categorySection: {
     backgroundColor: palette.white,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB'
+  },
+  categorySectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.light.text,
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.md
   },
   categoryScrollContainer: {
     paddingHorizontal: spacing.md,
@@ -351,33 +409,61 @@ const styles = StyleSheet.create({
     color: palette.white
   },
 
-  // Category Info
-  categoryInfoSection: {
+  // Stats Overview
+  statsOverview: {
     backgroundColor: palette.white,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB'
   },
-  categoryInfoTitle: {
-    fontSize: typography.fontSizes.lg,
+  statItem: {
+    alignItems: 'center'
+  },
+  statValue: {
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.light.text,
+    color: '#269a56ff',
     marginBottom: spacing.xs
   },
-  categoryInfoDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280'
+  },
+  statDivider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center'
   },
 
-  // Items
+  // Items Section
   itemsSection: {
     flex: 1,
     paddingTop: spacing.md
+  },
+  sectionHeader: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.light.text
+  },
+  sectionSubtitle: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: spacing.xs
   },
   itemsList: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xl
   },
+  
+  // Item Card
   itemCard: {
     backgroundColor: palette.white,
     borderRadius: 16,
@@ -390,6 +476,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3
+  },
+  premiumItemCard: {
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    backgroundColor: '#FFFDF0'
   },
   itemContent: {
     flex: 1
@@ -411,11 +502,32 @@ const styles = StyleSheet.create({
   itemIcon: {
     fontSize: 16
   },
+  premiumIcon: {
+    fontSize: 16,
+    color: '#FFD700'
+  },
+  itemTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
   itemTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.light.text,
     flex: 1
+  },
+  premiumBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: spacing.xs
+  },
+  premiumBadgeText: {
+    fontSize: 10,
+    color: '#333',
+    fontWeight: '700'
   },
   itemSubtitle: {
     fontSize: 14,
@@ -429,24 +541,45 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: spacing.sm
   },
-  tagsContainer: {
+  itemMeta: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs
   },
-  tag: {
+  itemCategory: {
+    fontSize: 12,
+    color: '#6B7280',
     backgroundColor: '#F3F4F6',
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: 8
   },
-  difficultyTag: {
-    backgroundColor: '#E0F2FE'
+  itemViews: {
+    fontSize: 12,
+    color: '#6B7280'
   },
-  tagText: {
+  itemStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  itemAuthor: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500'
+    fontStyle: 'italic'
+  },
+  likesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  likesIcon: {
+    fontSize: 12,
+    marginRight: spacing.xs
+  },
+  likesCount: {
+    fontSize: 12,
+    color: '#6B7280'
   },
   itemArrow: {
     marginLeft: spacing.sm
@@ -470,22 +603,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm
   },
 
-  // Item Meta
-  itemMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm
-  },
-  itemAuthor: {
-    fontSize: 12,
-    color: '#6B7280'
-  },
-  itemViews: {
-    fontSize: 12,
-    color: '#6B7280'
-  },
-
   // Empty State
   emptyState: {
     alignItems: 'center',
@@ -507,7 +624,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 20
+    lineHeight: 20,
+    marginBottom: spacing.lg
+  },
+  refreshButton: {
+    backgroundColor: '#269a56ff',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 8
+  },
+  refreshButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: palette.white
   }
 });
 

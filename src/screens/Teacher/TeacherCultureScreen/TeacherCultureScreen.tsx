@@ -56,7 +56,6 @@ const categories = [
   { id: 'Ẩm thực', label: 'Ẩm thực', icon: FirePitIcon },
   { id: 'Du lịch', label: 'Du lịch', icon: AirplaneIcon },
   { id: 'Điện ảnh', label: 'Điện ảnh', icon: FlimSlateIcon },
-  { id: 'Gia đình & Xã hội', label: 'Gia đình & Xã hội', icon: UserLove01Icon },
   { id: 'Làm đẹp', label: 'Làm đẹp', icon: SparklesIcon },
   { id: 'Lễ hội', label: 'Lễ hội', icon: Location01Icon },
   { id: 'Lịch sử', label: 'Lịch sử', icon: BookOpen01Icon },
