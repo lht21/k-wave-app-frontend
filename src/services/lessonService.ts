@@ -96,6 +96,32 @@ class LessonService {
     return this.fetchWithAuth<LessonsResponse>(url);
   }
 
+  // GET: Lấy bài học của user hiện tại
+async getMyLessons(params?: {
+  level?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  lessons: Lesson[];
+  total: number;
+  currentPage: number;
+  totalPages: number;
+}> {
+  const queryParams = new URLSearchParams();
+
+  if (params?.level) queryParams.append('level', params.level);
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+  const url = `${API_BASE_URL}/lessons/my${
+    queryParams.toString() ? `?${queryParams.toString()}` : ''
+  }`;
+
+  return this.fetchWithAuth(url);
+}
+
   // GET: Lấy bài học theo ID
   async getLessonById(id: string): Promise<Lesson> {
     return this.fetchWithAuth<Lesson>(`${API_BASE_URL}/lessons/${id}`);
