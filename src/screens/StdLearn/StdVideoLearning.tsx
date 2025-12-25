@@ -8,19 +8,15 @@ import {
   Image, 
   Dimensions 
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-import { RootStackParamList } from '../../types/navigation';
-
-type StdVideoLearningNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
 const StdVideoLearning: React.FC = () => {
-  const navigation = useNavigation<StdVideoLearningNavigationProp>();
+  const router = useRouter();
 
   // Mock data cho các video
   const videoCategories = [
@@ -109,16 +105,22 @@ const StdVideoLearning: React.FC = () => {
   ];
 
   const handleVideoPress = (video: any) => {
-    navigation.navigate('VideoDetail', {
-      videoId: video.id,
-      videoTitle: video.title
+    router.push({
+      pathname: '/(student)/video-detail',
+      params: {
+        videoId: video.id,
+        videoTitle: video.title
+      }
     });
   };
 
   const handleSeeMore = (categoryId: string, categoryTitle: string) => {
-    navigation.navigate('VideoCategory', {
-      categoryId,
-      categoryTitle
+    router.push({
+      pathname: '/(student)/video-category',
+      params: {
+        categoryId,
+        categoryTitle
+      }
     });
   };
 
@@ -179,7 +181,7 @@ const StdVideoLearning: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>

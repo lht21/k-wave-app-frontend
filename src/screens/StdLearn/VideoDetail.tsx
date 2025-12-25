@@ -9,22 +9,18 @@ import {
   Modal,
   Switch
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-import { RootStackParamList } from '../../types/navigation';
-
-type VideoDetailNavigationProp = StackNavigationProp<RootStackParamList>;
-type VideoDetailRouteProp = RouteProp<RootStackParamList, 'VideoDetail'>;
 
 const { width, height } = Dimensions.get('window');
 
 const VideoDetail: React.FC = () => {
-  const navigation = useNavigation<VideoDetailNavigationProp>();
-  const route = useRoute<VideoDetailRouteProp>();
-  const { videoId, videoTitle } = route.params;
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const videoId = params.videoId as string;
+  const videoTitle = params.videoTitle as string;
   
   const [selectedTab, setSelectedTab] = useState<'listening' | 'vocabulary' | 'grammar' | 'settings'>('listening');
   const [isPlaying, setIsPlaying] = useState(false);

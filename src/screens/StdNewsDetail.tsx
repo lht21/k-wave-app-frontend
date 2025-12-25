@@ -11,12 +11,10 @@ import {
   Share,
   ActivityIndicator
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../theme/spacing';
 import { colors, palette } from '../theme/colors';
 import { typography } from '../theme/typography';
-import { RootStackParamList } from '../types/navigation';
 import ClickableText from '../components/ClickableText';
 import WordPopup from '../components/WordPopup';
 import { useWordPopup } from '../hooks/useWordPopup'
@@ -24,15 +22,12 @@ import { getNewsById, getRelatedNews } from '../services/newsApiService'
 import { NewsArticle } from '../types/news'
 import { useFavoriteNews } from '../contexts/FavoriteNewsContext'
 
-type NewsDetailNavigationProp = StackNavigationProp<RootStackParamList>;
-type NewsDetailRouteProp = RouteProp<RootStackParamList, 'NewsDetail'>;
-
 const { width: screenWidth } = Dimensions.get('window');
 
 const NewsDetail: React.FC = () => {
-  const navigation = useNavigation<NewsDetailNavigationProp>();
-  const route = useRoute<NewsDetailRouteProp>();
-  const { newsId } = route.params;
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const newsId = params.newsId as string;
   
   const [article, setArticle] = useState<any>(null) // Use any to handle API response
   const [relatedArticles, setRelatedArticles] = useState<any[]>([])
@@ -173,7 +168,7 @@ const NewsDetail: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>돌아가기</Text>
           </TouchableOpacity>
         </View>
@@ -187,7 +182,7 @@ const NewsDetail: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>기사를 찾을 수 없습니다</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>돌아가기</Text>
           </TouchableOpacity>
         </View>
@@ -199,7 +194,7 @@ const NewsDetail: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
           <Text style={styles.headerButtonText}>←</Text>
         </TouchableOpacity>
         
@@ -301,9 +296,12 @@ const NewsDetail: React.FC = () => {
               <TouchableOpacity
                 key={relatedArticle.id}
                 style={styles.relatedCard}
-                onPress={() => navigation.push('NewsDetail', { 
-                  newsId: relatedArticle.id, 
-                  title: relatedArticle.title || '제목 없음'
+                onPress={() => router.push({
+                  pathname: '/(student)/news-detail',
+                  params: {
+                    newsId: relatedArticle.id, 
+                    title: relatedArticle.title || '제목 없음'
+                  }
                 })}
               >
                 {relatedArticle.imageUrl ? (

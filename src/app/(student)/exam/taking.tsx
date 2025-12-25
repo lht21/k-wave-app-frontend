@@ -1,10 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import StdExamTaking from '../../../screens/StdLearn/StdExamTaking';
 
-const TakingExam = () => {
-  return (
-    <View><Text>Taking Exam Screen</Text></View>
-  );
-};
-
-export default TakingExam; // <-- Bắt buộc phải có dòng này
+export default function TakingExam() {
+  return <StdExamTaking />;
+}
