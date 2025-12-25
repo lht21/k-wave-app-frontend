@@ -1,18 +1,14 @@
 // app/(teacher)/(tabs)/_layout.tsx
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import {
-  Home01Icon,
-  BookBookmark01Icon,
-  Mortarboard02Icon,
-  GlobalIcon,
-  News01Icon,
-  Settings02Icon,
-} from '@hugeicons/core-free-icons';
+
+import { HouseSimpleIcon, ExamIcon, LightningIcon, GearSixIcon, GlobeHemisphereEastIcon } from 'phosphor-react-native';
+
 import { palette } from '../../../theme/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TeacherTabsLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={({ route }) => ({
@@ -23,51 +19,68 @@ export default function TeacherTabsLayout() {
           backgroundColor: palette.white,
           borderTopWidth: 1,
           borderTopColor: palette.gray100,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + (insets.bottom > 0 ? insets.bottom - 10 : 10), 
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 20,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontFamily: 'Roboto-Regular', // Font của bạn
+          fontFamily: 'Roboto-Regular', // Hoặc font bạn đang dùng
         },
       })}
     >
-      <Tabs.Screen 
-        name="index" // Home
-        options={{ 
+      
+      <Tabs.Screen
+        name="index" 
+        options={{
           tabBarLabel: 'Trang chủ',
           tabBarIcon: ({ focused, color, size }) => (
-            <HugeiconsIcon icon={Home01Icon} size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-          )
-        }} 
+            <HouseSimpleIcon 
+            size={size} 
+            color={color} 
+            weight={focused ? 'fill' : 'regular'} 
+            />
+          ),
+        }}
       />
       <Tabs.Screen 
         name="lessons" 
-        options={{ 
+        options={{
           tabBarLabel: 'Bài học',
           tabBarIcon: ({ focused, color, size }) => (
-             <HugeiconsIcon icon={BookBookmark01Icon} size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-          )
-        }} 
+            <LightningIcon
+            size={size} 
+            color={color} 
+            weight={focused ? 'fill' : 'regular'} 
+            />
+          ),
+        }}
       />
       <Tabs.Screen 
         name="exams" 
-        options={{ 
+        options={{
           tabBarLabel: 'Đề thi',
           tabBarIcon: ({ focused, color, size }) => (
-            <HugeiconsIcon icon={Mortarboard02Icon} size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-          )
-        }} 
+            <ExamIcon 
+            size={size} 
+            color={color} 
+            weight={focused ? 'fill' : 'regular'} 
+            />
+          ),
+        }}
       />
       <Tabs.Screen 
         name="culture" 
-        options={{ 
+        options={{
           tabBarLabel: 'Văn hóa',
           tabBarIcon: ({ focused, color, size }) => (
-            <HugeiconsIcon icon={GlobalIcon} size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-          )
-        }} 
+            <GlobeHemisphereEastIcon 
+            size={size} 
+            color={color} 
+            weight={focused ? 'fill' : 'regular'} 
+            />
+          ),
+        }}
       />
       {/* Nếu muốn mở lại News thì uncomment */}
       {/* <Tabs.Screen 
@@ -82,11 +95,15 @@ export default function TeacherTabsLayout() {
       */}
       <Tabs.Screen 
         name="settings" 
-        options={{ 
+        options={{
           tabBarLabel: 'Cài đặt',
           tabBarIcon: ({ focused, color, size }) => (
-            <HugeiconsIcon icon={Settings02Icon} size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-          )
+            <GearSixIcon
+              size={size} 
+              color={color} 
+              weight={focused ? 'fill' : 'regular'} 
+            />
+          ),
         }} 
       />
     </Tabs>

@@ -15,7 +15,9 @@ export default function StudentLayout() {
       <Stack.Screen name="roadmap-detail" options={{ headerShown: false }} />
       
       {/* StdLesson: Sử dụng dynamic route [id].tsx sẽ hay hơn, nhưng nếu giữ tên cũ: */}
-      <Stack.Screen name="lesson" options={{ headerShown: false }} />
+      {/* // src/app/(student)/_layout.tsx */}
+      <Stack.Screen name="lesson/[id]/index" options={{ headerShown: false }} />
+      <Stack.Screen name="lesson/[id]/flashcard" options={{ headerShown: false }} />
       
       <Stack.Screen name="skill-practice" options={{ headerShown: false }} />
       

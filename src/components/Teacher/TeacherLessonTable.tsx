@@ -8,35 +8,39 @@ import {
     StyleSheet,
     ActivityIndicator
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { 
-    EyeIcon,
-    Edit01Icon,
-    Delete02Icon,
-    PlusSignIcon 
-} from '@hugeicons/core-free-icons';
 
-import Button from '../../../components/Button/Button';
-import ModalLesson from '../../../components/Modal/ModalLesson';
-import { colors, palette } from '../../../theme/colors';
-import { typography } from '../../../theme/typography';
-import { lessonService, Lesson } from '../../../services/lessonService';
+
+
+import Button from '../Button/Button';
+import ModalLesson from '../Modal/ModalLesson';
+import { colors, palette } from '../../theme/colors';
+import { typography } from '../../theme/typography';
+import { lessonService, Lesson } from '../../services/lessonService';
+import { PencilSimpleIcon, PlusCircleIcon, TrashIcon, EyeIcon } from 'phosphor-react-native';
+
+const UI_COLORS = {
+  primaryGreen: '#00D95F',
+  lightMint: '#A7FFEB',
+  textDark: '#1A1A1A',
+  textGray: '#666666',
+  cardBg: '#FFFFFF',
+  borderGray: '#EEEEEE',
+  danger: '#FF5252',
+  warning: '#FFAB00',
+};
 
 // Types
 interface TeacherLessonTableProps {
     selectedLevel: string;
 }
 
-type RootStackParamList = {
-    LessonDetail: { lessonId: string };
-};
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+
 
 const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel = 'Sơ cấp 1' }) => {
-    const navigation = useNavigation<NavigationProp>();
+    const router = useRouter();
 
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [selectedLessons, setSelectedLessons] = useState<Set<string>>(new Set());
@@ -45,6 +49,10 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [isAdding, setIsAdding] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        loadLessons();
+    }, [selectedLevel]);
 
     // Load bài học từ API
     const loadLessons = async () => {
@@ -60,9 +68,7 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         }
     };
 
-    useEffect(() => {
-        loadLessons();
-    }, [selectedLevel]);
+    
 
     // Check if all lessons are selected
     useEffect(() => {
@@ -186,7 +192,11 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
     };
 
     const handleViewDetails = (lessonId: string): void => {
-        navigation.navigate('LessonDetail', { lessonId });
+        if (!lessonId) {
+            Alert.alert('Lỗi', 'ID bài học không tồn tại');
+            return;
+        }
+        router.push(`/(teacher)/lesson/${lessonId}`);
     };
 
     const handleSelectLesson = (lessonId: string): void => {
@@ -234,12 +244,58 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
         );
     }
 
+    // Component Thẻ bài học (Thay thế cho Table cũ)
+  const LessonCard = ({ item }: { item: any }, isSelected: boolean) => (
+    <View style={styles.lessonCard}>
+      <View style={styles.cardTopRow}>
+        <Checkbox 
+            selected={isSelected} 
+            onPress={() => handleSelectLesson(item._id!)} 
+        />
+        
+        <View style={styles.cardInfo}>
+          <Text style={styles.lessonTitle}>{item.title}</Text>
+          <Text style={styles.lessonSub}>{item.description}</Text>
+        </View>
+
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.iconBtn}  onPress={() => handleViewDetails(item._id!)}>
+            <EyeIcon size={22} color={UI_COLORS.primaryGreen} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEditLesson(item._id!)}>
+            <PencilSimpleIcon size={22} color={UI_COLORS.warning} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDeleteLesson(item._id!)}>
+            <TrashIcon size={22} color={UI_COLORS.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.cardBottomRow}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{item.level}</Text>
+        </View>
+        {item.isPremium && (
+            <View style={styles.premiumBadge}>
+                <Text style={styles.premiumText}>Premium</Text>
+            </View>
+        )}
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>Mã bài: {item.code}</Text>
+        </View>
+
+      </View>
+    </View>
+  );
+
     return (
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
+
                 <View>
-                    <Text style={styles.title}>BÀI HỌC - {selectedLevel}</Text>
+                    <Text style={styles.sectionTitle}>Bài học tương ứng</Text>
+                    <Text style={styles.lessonCountSub}>Danh sách bài học của {selectedLevel}</Text>
                     <Text style={styles.subtitle}>
                         {lessons.length} bài học
                         {selectedLessons.size > 0 && ` • ${selectedLessons.size} đã chọn`}
@@ -247,33 +303,24 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                 </View>
                 
                 <View style={styles.actions}>
-                    <Button
-                        title="Thêm bài học"
-                        variant="primary"
-                        size="small"
-                        leftIcon={<HugeiconsIcon icon={PlusSignIcon} size={16} color={palette.white} />}
-                        onPress={handleAddLesson}
-                    />
+                    <TouchableOpacity style={styles.addBtn} activeOpacity={0.8} onPress={handleAddLesson}>
+                        <PlusCircleIcon size={22} color="#FFF" weight="fill" />
+                        <Text style={styles.addBtnText}>Thêm bài học</Text>
+                    </TouchableOpacity>
 
                     {selectedLessons.size > 0 && (
-                        <Button
-                            title={`Xóa (${selectedLessons.size})`}
-                            variant="danger"
-                            size="small"
-                            leftIcon={<HugeiconsIcon icon={Delete02Icon} size={16} color={palette.white} />}
-                            onPress={handleBulkDelete}
-                        />
+                        <TouchableOpacity style={styles.deleteBtn} activeOpacity={0.8} onPress={handleBulkDelete}>
+                            <TrashIcon size={22} color="#FFF" weight="fill" />
+                            <Text style={styles.addBtnText}>{`Xóa (${selectedLessons.size})`}</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
             </View>
-
-            {/* Table Header */}
             <View style={styles.tableHeader}>
                 <Checkbox selected={isSelectAll} onPress={handleSelectAll} />
-                <Text style={styles.columnHeader}>MÃ BÀI</Text>
-                <Text style={styles.columnHeader}>TÊN BÀI HỌC</Text>
-                <Text style={styles.columnHeader}>HÀNH ĐỘNG</Text>
+                <Text style={styles.subtitle}>Chọn tất cả</Text>
             </View>
+
 
             {/* Table Body */}
             <ScrollView style={styles.tableBody}>
@@ -282,58 +329,7 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                         const isSelected = selectedLessons.has(lesson._id!);
                         
                         return (
-                            <View
-                                key={lesson._id}
-                                style={[
-                                    styles.tableRow,
-                                    isSelected && styles.tableRowSelected
-                                ]}
-                            >
-                                <Checkbox 
-                                    selected={isSelected} 
-                                    onPress={() => handleSelectLesson(lesson._id!)} 
-                                />
-
-                                <Text style={styles.lessonCode}>{lesson.code}</Text>
-
-                                <View style={styles.lessonInfo}>
-                                    <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                                    <View style={styles.lessonMeta}>
-                                        <View style={styles.levelBadge}>
-                                            <Text style={styles.levelText}>{lesson.level}</Text>
-                                        </View>
-                                        {lesson.isPremium && (
-                                            <View style={styles.premiumBadge}>
-                                                <Text style={styles.premiumText}>Premium</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text style={styles.lessonDescription}>{lesson.description}</Text>
-                                </View>
-
-                                <View style={styles.columnActions}>
-                                    <TouchableOpacity
-                                        onPress={() => handleViewDetails(lesson._id!)}
-                                        style={styles.actionBtn}
-                                    >
-                                        <HugeiconsIcon icon={EyeIcon} size={20} color={colors.light.primary} />
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={() => handleEditLesson(lesson._id!)}
-                                        style={styles.actionBtn}
-                                    >
-                                        <HugeiconsIcon icon={Edit01Icon} size={20} color={palette.warning} />
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={() => handleDeleteLesson(lesson._id!)}
-                                        style={styles.actionBtn}
-                                    >
-                                        <HugeiconsIcon icon={Delete02Icon} size={20} color={palette.error} />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
+                            <LessonCard key={lesson._id} item={lesson} isSelected={isSelected} />
                         );
                     })
                 ) : (
@@ -341,12 +337,10 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
                         <Text style={styles.emptyText}>
                             Không có bài học nào cho level {selectedLevel}
                         </Text>
-                        <Button 
-                            title="Thêm bài học đầu tiên"
-                            variant="primary"
-                            leftIcon={<HugeiconsIcon icon={PlusSignIcon} size={16} color={palette.white} />}
-                            onPress={handleAddLesson}
-                        />
+                        <TouchableOpacity style={styles.addBtn} activeOpacity={0.8} onPress={handleAddLesson}>
+                            <PlusCircleIcon size={22} color="#FFF" weight="fill" />
+                            <Text style={styles.addBtnText}>Thêm bài học đầu tiên</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
@@ -365,6 +359,36 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    addBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: UI_COLORS.primaryGreen,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        borderRadius: 20,
+        shadowColor: UI_COLORS.primaryGreen,
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    addBtnText: {
+        color: '#FFF',
+        fontWeight: '700',
+        marginLeft: 6,
+        fontSize: 13,
+    },
+    deleteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF5252',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        borderRadius: 20,
+        shadowColor: '#FF5252',
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 3,
     },
     loadingContainer: {
         flex: 1,
@@ -464,12 +488,6 @@ const styles = StyleSheet.create({
         marginHorizontal: 12,
 
     },
-    lessonTitle: {
-        fontSize: typography.fontSizes.sm,
-        fontFamily: typography.fonts.semiBold,
-        color: colors.light.text,
-        marginBottom: 6,
-    },
     lessonMeta: {
         flexDirection: 'row',
         gap: 6,
@@ -522,6 +540,49 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontFamily: typography.fonts.regular,
     },
+    // Lesson Header
+  lessonHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  lessonCount: { fontSize: 12, color: UI_COLORS.textGray, fontWeight: '600', marginTop: -10 },
+  
+  // Lesson Cards
+  listContainer: { gap: 15 },
+  lessonCard: {
+    backgroundColor: UI_COLORS.cardBg,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: UI_COLORS.borderGray,
+    
+    marginBottom: 12,
+  },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+  placeholderImg: { width: 40, height: 40, backgroundColor: '#D9D9D9', borderRadius: 8 },
+  cardInfo: { flex: 1, marginLeft: 12 },
+  lessonTitle: { fontSize: 15, fontWeight: '700', color: UI_COLORS.textDark },
+  lessonSub: { fontSize: 13, color: UI_COLORS.textGray, marginTop: 2 },
+  
+  actionButtons: { flexDirection: 'row', gap: 10 },
+  iconBtn: { padding: 5 },
+
+  cardBottomRow: { flexDirection: 'row', gap: 10 },
+  badge: {
+    backgroundColor: UI_COLORS.lightMint,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: UI_COLORS.primaryGreen,
+    },
+    lessonCountSub: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '600',
+        marginTop: 2,
+    },
+  badgeText: { fontSize: 11, fontWeight: '700', color: UI_COLORS.primaryGreen },
 });
 
 export default TeacherLessonTable;

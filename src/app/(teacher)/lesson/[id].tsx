@@ -23,6 +23,8 @@ import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
 import { lessonService, Lesson } from '../../../services/lessonService';
 import { vocabularyService, Vocabulary } from '../../../services/vocabularyService';
+import { Grammar } from '../../../types/lesson';
+import { Listening } from '../../../services/listeningService';
 
 // Types
 interface RootStackParamList {
@@ -35,11 +37,13 @@ type RouteProps = RouteProp<RootStackParamList, 'LessonDetail'>;
 
 const LessonDetailScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { lessonId } = useLocalSearchParams();
-  const id = lessonId as string;
+  const { id } = useLocalSearchParams();
+  
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [vocabulary, setVocabulary] = useState<Vocabulary[]>([]);
+  const [grammar, setGrammar] = useState<Grammar[]>([]);
+  const [listenings, setListenings] = useState<Listening[]>([]);
   const [selectedTab, setSelectedTab] = useState<string>('vocabulary');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingVocabulary, setEditingVocabulary] = useState<Vocabulary | null>(null);
@@ -50,10 +54,17 @@ const LessonDetailScreen: React.FC = () => {
 
   // Load bài học từ API
   const loadLesson = async () => {
+    if (!id || id === 'undefined') {
+      console.warn('ID không hợp lệ:', id);
+      return;
+    }
     try {
       setLoading(true);
       const lessonData = await lessonService.getLessonById(id);
       setLesson(lessonData);
+      setVocabulary(lessonData.vocabulary || []);
+      setGrammar(lessonData.grammar || []);
+      setListenings(lessonData.listening || []);
     } catch (error: any) {
       console.error('Error loading lesson:', error);
       Alert.alert('Lỗi', error.message || 'Không thể tải bài học');
@@ -63,32 +74,13 @@ const LessonDetailScreen: React.FC = () => {
     }
   };
 
-  // Load từ vựng từ API
-  const loadVocabulary = async () => {
-    try {
-      setVocabularyLoading(true);
-      const response = await vocabularyService.getVocabularyByLesson(id, {
-        search: searchTerm,
-        limit: 50
-      });
-      setVocabulary(response.vocabulary);
-    } catch (error: any) {
-      console.error('Error loading vocabulary:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể tải từ vựng');
-    } finally {
-      setVocabularyLoading(false);
-    }
-  };
+  
 
   useEffect(() => {
     loadLesson();
-  }, [lessonId]);
+  }, [id]);
 
-  useEffect(() => {
-    if (selectedTab === 'vocabulary') {
-      loadVocabulary();
-    }
-  }, [selectedTab, searchTerm]);
+
 
   const handleAddVocabulary = (): void => {
     setIsAdding(true);
@@ -189,25 +181,41 @@ const LessonDetailScreen: React.FC = () => {
           />
         );
       case 'grammar':
-        return <GrammarTab 
-            lessonId={lessonId} 
+        return (
+          <GrammarTab 
+            grammar={grammar} // Truyền mảng trực tiếp từ object lesson
+            loading={loading}
+            // onAddGrammar={handleOpenAddModal}
+            // onEditGrammar={(item) => handleOpenEditModal(item)}
+            // onDeleteGrammar={handleDeleteGrammarApi}
           />
+        )
 
       case 'listening':
-        return <ListeningTab 
-            lessonId={lessonId} 
-          />;
+        return (
+          <ListeningTab 
+            listenings={listenings}
+            // loading={listeningsLoading}
+            // onAddListening={() => { /* Mở modal listening */ }}
+            // onEditListening={(item) => { /* Logic edit */ }}
+            // onDeleteListening={async (id) => {
+            //     // Thực hiện xóa API và reload data
+            //     await listeningService.deleteListening(id);
+            //     loadListenings();
+            // }}
+          />
+        );
       case 'speaking':
         return <SpeakingTab 
-            lessonId={lessonId} 
+            lessonId={id} 
           />;
       case 'reading':
         return <ReadingTab 
-            lessonId={lessonId} 
+            lessonId={id} 
         />;
       case 'writing':
         return <WritingTab 
-           lessonId={lessonId} 
+           lessonId={id} 
         />;
       default:
         return (
@@ -250,12 +258,6 @@ const LessonDetailScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.lessonCode}>{lesson.code}</Text>
           <Text style={styles.lessonTitle}>{lesson.title}</Text>

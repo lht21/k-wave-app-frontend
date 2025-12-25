@@ -18,6 +18,7 @@ export interface Lesson {
     name: string;
     email: string;
   };
+  
 }
 
 export interface LessonsResponse {

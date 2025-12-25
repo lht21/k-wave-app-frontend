@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import CourseList from '../../../components/CourseList/CourseList';
-import TeacherLessonTable from './TeacherLessonTable';
+import TeacherLessonTable from '../../../components/Teacher/TeacherLessonTable';
 import { colors } from '../../../theme/colors';
 
 const TeacherLessonsScreen = () => {

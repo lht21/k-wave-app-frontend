@@ -19,7 +19,7 @@ export default function TeacherLayout() {
       
       {/* Chi tiết bài học */}
       <Stack.Screen 
-        name="lesson" 
+        name="lesson/[id]" 
         options={{ 
           headerShown: true, 
           title: 'Chi tiết Bài học' 

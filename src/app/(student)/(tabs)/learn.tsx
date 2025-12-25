@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { CaretDownIcon, LightningIcon } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Lesson, lessonService } from '../../../services/lessonService';
+import Modal from "react-native-modal";
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 const COLORS = {
-  primaryGreen: '#00C853', 
+  primaryGreen: '#3bbc84ff', 
   textDark: '#1A1A1A',     
   textGray: '#666666',
   cardBg: '#F0F2F5',      
@@ -23,34 +27,82 @@ const COLORS = {
   decorativeShape: '#E5E7EB',
 };
 
-// Dữ liệu giả lập bài học tương ứng
-const MOCK_LESSONS = [
-  { id: '1', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'learning' },
-  { id: '2', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-  { id: '3', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-  { id: '4', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-];
+const levels = [
+  {id: '1', levelName: 'Sơ cấp 1'},
+  {id: '2', levelName: 'Sơ cấp 2'},
+  {id: '3', levelName: 'Trung cấp 3'},
+  {id: '4', levelName: 'Trung cấp 4'},
+  {id: '5', levelName: 'Cao cấp 5'},
+  {id: '6', levelName: 'Cao cấp 6'},
+
+
+]
+
+// // Dữ liệu giả lập bài học tương ứng
+// const MOCK_LESSONS = [
+//   { id: '1', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'learning' },
+//   { id: '2', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
+//   { id: '3', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
+//   { id: '4', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
+// ];
 
 export default function StdLearn() {
   const [currentLevel, setCurrentLevel] = useState('Sơ cấp 1');
+  const [isLoading, setIsLoading] = useState(false)
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false)
+  const router = useRouter()
+
+  const toggleSheet = () => {
+      setIsModalVisible(!isModalVisible);
+  };
+
+  const handleSelectLevel = (selectedLevel: string) => {
+    setCurrentLevel(selectedLevel)
+    toggleSheet()
+  }
+
+  const loadLessons = async () => {
+      try {
+          setIsLoading(true);
+          const response = await lessonService.getLessons({ level: currentLevel });
+          setLessons(response.lessons);
+      } catch (error: any) {
+          console.error('Error loading lessons:', error);
+          Alert.alert('Lỗi', error.message || 'Không thể tải danh sách bài học');
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  useEffect(() => {
+      loadLessons();
+  }, [currentLevel]);
 
   // Component cho thẻ bài học
-  const LessonCard = ({ item }: { item: typeof MOCK_LESSONS[0] }) => (
-    <TouchableOpacity style={styles.lessonCard} activeOpacity={0.8}>
+  const LessonCard = ({ item }: { item: typeof lessons[0] }) => (
+    <TouchableOpacity style={styles.lessonCard} activeOpacity={0.8} 
+        onPress={() => {
+          router.push({
+            pathname: "/(student)/lesson/[id]",
+            params: { id: item._id }
+          });
+        }}
+    >
       <View style={styles.lessonIconContainer}>
         <LightningIcon size={24} color={COLORS.primaryGreen} weight="fill" />
       </View>
       
       <View style={styles.lessonInfo}>
-        <Text style={styles.lessonIndex}>{item.index} - {item.sub}</Text>
+        <Text style={styles.lessonIndex}>{item.title} - {item.code}</Text>
         <Text style={styles.lessonTitle}>{item.title}</Text>
       </View>
 
-      {item.status === 'learning' && (
+      {/* {item.status === 'learning' && (
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>Đang học</Text>
         </View>
-      )}
+      )} */}
 
       {/* Mảng trang trí góc đặc trưng */}
       <View style={styles.decorativeShape} />
@@ -72,7 +124,7 @@ export default function StdLearn() {
             <Text style={styles.sectionTitle}>Cấp độ hiện tại</Text>
             <TouchableOpacity 
               style={styles.pickerContainer} 
-              onPress={() => console.log('Mở bộ chọn cấp độ')}
+              onPress={toggleSheet}
             >
               <Text style={styles.levelText}>{currentLevel}</Text>
               <CaretDownIcon size={24} color={COLORS.primaryGreen} weight="bold" />
@@ -84,14 +136,38 @@ export default function StdLearn() {
           {/* Section: Bài học tương ứng */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Bài học tương ứng</Text>
-            {MOCK_LESSONS.map((lesson) => (
-              <LessonCard key={lesson.id} item={lesson} />
+            {lessons.map((lesson) => (
+              <LessonCard key={lesson._id} item={lesson} />
             ))}
           </View>
           
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
+      <Modal 
+        isVisible={isModalVisible}
+        onBackdropPress={toggleSheet}
+        style={{ justifyContent: 'flex-end', margin: 0 }}
+      >
+        <View style={styles.sheetContent}>
+          <Text style={[styles.sheetTitle, {marginBottom: 15}]}>Tất cả cấp độ</Text>
+    
+          {levels.map(item => (
+            <TouchableOpacity key={item.id} style={[styles.pickerContainer, {marginBottom: 10}]} onPress={() => handleSelectLevel(item.levelName)}>
+              <Text style={styles.levelText}>{item.levelName}</Text>
+              {currentLevel === item.levelName && (
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>Cấp độ đang chọn</Text>
+                </View>
+
+              )}      
+            </TouchableOpacity>
+          ))}
+         
+          
+        </View>
+        
+      </Modal>
     </View>
   );
 }
@@ -180,12 +256,28 @@ const styles = StyleSheet.create({
 
   decorativeShape: {
     position: 'absolute',
-    bottom: -20,
     right: -20,
+    bottom: -20,
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.decorativeShape,
-    zIndex: 1,
+    backgroundColor: '#E2E8F0',
+    zIndex: -1,
+  },
+
+
+  ///modal style
+  sheetContent: {
+      backgroundColor: 'white',
+      padding: 22,
+      borderTopLeftRadius: 30, // Bo 2 góc trên
+      borderTopRightRadius: 30,
+      // Thêm 1 chút padding an toàn ở dưới cho các máy có thanh "home"
+      paddingBottom: 30, 
+  },
+  sheetTitle: {
+      fontSize: 20,
+      color: '#333',
+      fontWeight: 'bold',
   },
 });

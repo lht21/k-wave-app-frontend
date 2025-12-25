@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { CrownIcon, CheckCircleIcon } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import HeaderBg from '../../../assets/'
 
 const { width } = Dimensions.get('window');
 

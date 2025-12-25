@@ -11,6 +11,7 @@ export interface Vocabulary {
   category?: string;
   examples?: string[];
   level: string;
+  status?: 'unlearned' | 'learning' | 'mastered';
   lesson?: {
     _id: string;
     title: string;
@@ -28,6 +29,16 @@ export interface VocabularyResponse {
 }
 
 class VocabularyService {
+  
+  
+  async getVocabForLearning(lessonId: string): Promise<{ success: boolean, data: Vocabulary[] }> {
+    const url = `${API_BASE_URL}/vocabulary/lesson/${lessonId}/learn`;
+    console.log('📖 Fetching vocabulary for learning (excluding mastered):', lessonId);
+    return this.fetchWithAuth<{ success: boolean, data: Vocabulary[] }>(url);
+  }
+
+  
+
   private async fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
     const token = await authService.getToken();
     

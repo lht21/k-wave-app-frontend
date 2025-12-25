@@ -1,7 +1,7 @@
 // screens/Setting/SettingScreen.tsx
 import React, { useCallback } from 'react'; // Thêm useCallback
 import { View, ScrollView, Alert, TouchableOpacity, Text, StyleSheet, Image } from 'react-native'; // Thêm Image
-import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Thêm useFocusEffect
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native'; // Thêm useFocusEffect
 import { StackNavigationProp } from '@react-navigation/stack';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { 
@@ -20,6 +20,7 @@ import Button from '../../../components/Button/Button';
 import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRouter } from 'expo-router';
 
 // Cập nhật RootStackParamList
 type RootStackParamList = {
@@ -37,6 +38,7 @@ type TeacherStackParamList = {
 type NavigationProp = StackNavigationProp<any>;
 
 const SettingScreen = () => {
+  const router = useRouter();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout, isLoading, refreshUser } = useAuth(); 
   // Tự động reload thông tin khi quay lại màn hình này
@@ -90,7 +92,7 @@ const SettingScreen = () => {
       title: 'Thông tin cá nhân', 
       icon: UserIcon,
       description: 'Quản lý thông tin tài khoản',
-      onPress: () => navigation.navigate('TeacherProfile') 
+      onPress: () => router.push('(teacher)/profile')
     },
     { 
       title: 'Thông báo', 

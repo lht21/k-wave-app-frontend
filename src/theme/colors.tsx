@@ -1,6 +1,6 @@
 export const palette = {
-  primary: '#269a56ff',
-secondary: '#A1BC98' ,// cam nhạt, nổi bật với xanh lá
+    primary: '#00C853',
+    secondary: '#A1BC98', 
     surface: '#FFFFFF',
     error: '#B00020',
     onPrimary: '#FFFFFF',
@@ -21,6 +21,10 @@ secondary: '#A1BC98' ,// cam nhạt, nổi bật với xanh lá
     warning: '#FFA000',
     success: '#388E3C',
     info: '#1976D2',
+
+    statBlue: '#C5D8FF',
+    statOrange: '#FFCC91',
+    statGreen: '#C7FFD8',
 };
 
 export const colors = {
