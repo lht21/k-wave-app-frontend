@@ -92,7 +92,7 @@ const SettingScreen = () => {
       title: 'Thông tin cá nhân', 
       icon: UserIcon,
       description: 'Quản lý thông tin tài khoản',
-      onPress: () => router.push('(teacher)/profile')
+      onPress: () => router.push('(teacher)/profile/profile')
     },
     { 
       title: 'Thông báo', 

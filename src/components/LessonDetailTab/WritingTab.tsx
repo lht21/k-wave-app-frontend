@@ -55,32 +55,32 @@ const WritingTab: React.FC<WritingTabProps> = ({ lessonId }) => {
   const [selectedLesson, setSelectedLesson] = useState<Writing | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<WritingSubmission | null>(null);
 
-  // Load writing lessons
-  const loadLessons = useCallback(async () => {
-    try {
-      setLoading(true);
-      let response;
-      
-      if (lessonId) {
-        response = await writingService.getWritingsByLesson(lessonId, {
-          search: searchTerm,
-          limit: 50
-        });
-      } else {
-        response = await writingService.getWritings({
-          search: searchTerm,
-          limit: 50
-        });
-      }
-      
-      setLessons(response.writings || []);
-    } catch (error: any) {
-      console.error('Error loading writing lessons:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể tải bài viết');
-    } finally {
-      setLoading(false);
+const loadLessons = useCallback(async () => {
+  try {
+    setLoading(true);
+    let response;
+    
+    if (lessonId) {
+      response = await writingService.getWritingsByLesson(lessonId);
+    } else {
+      response = await writingService.getWritings({
+        search: searchTerm,
+        limit: 50
+      });
     }
-  }, [lessonId, searchTerm]);
+    
+    // PHÒNG THỦ: Kiểm tra mọi trường hợp key có thể trả về
+    const dataFromServer = response.writings || (Array.isArray(response) ? response : []);
+    
+    console.log('📝 Dữ liệu writing nhận được:', dataFromServer.length);
+    setLessons(dataFromServer);
+  } catch (error: any) {
+    // ...
+  } finally {
+    setLoading(false);
+  }
+}, [lessonId, searchTerm]);
+
 
   // Load submissions (for teacher)
   const loadSubmissions = useCallback(async () => {

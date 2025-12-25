@@ -117,28 +117,14 @@ class SpeakingService {
   }
 
   // GET: Lấy speaking theo lesson
-  async getSpeakingByLesson(
-    lessonId: string, 
-    params?: {
-      search?: string;
-      page?: number;
-      limit?: number;
-    }
-  ): Promise<SpeakingResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params?.search) queryParams.append('search', params.search);
-      if (params?.page) queryParams.append('page', params.page.toString());
-      if (params?.limit) queryParams.append('limit', params.limit.toString());
-      
-      const url = `${API_BASE_URL}/speakings/lesson/${lessonId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      console.log('🎤 Fetching speaking exercises for lesson:', lessonId);
-      return await this.fetchWithAuth<SpeakingResponse>(url);
-    } catch (error) {
-      console.error('Error fetching speaking exercises:', error);
-      throw error;
-    }
+  async getSpeakingByLesson(lessonId: string): Promise<Speaking[]> {
+    const url = `${API_BASE_URL}/speakings/lesson/${lessonId}`;
+    
+    // Gọi API với cấu trúc response mới { success: boolean, data: Speaking[] }
+    const response = await this.fetchWithAuth<{ success: boolean; data: Speaking[] }>(url);
+    
+    // Trả về mảng data trực tiếp để UI map
+    return response.data || [];
   }
 
   // POST: Tạo speaking cho lesson

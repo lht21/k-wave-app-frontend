@@ -370,6 +370,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: palette.white,
+    marginTop: 40
   },
   centerContainer: {
     flex: 1,

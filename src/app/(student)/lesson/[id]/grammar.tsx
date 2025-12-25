@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { XIcon } from 'phosphor-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -29,17 +30,53 @@ export default function GrammarDetailScreen() {
   const router = useRouter();
   // Giả định bạn truyền dữ liệu qua params, nếu không có sẽ dùng dữ liệu mặc định
   const params = useLocalSearchParams();
+  const { grammarData } = useLocalSearchParams();
 
-  const grammarData = {
-    title: params.title || '-습니다/-습니까?',
-    meaning: params.meaning || 'Là...',
-    explanation: params.explanation || 'Đuôi câu kính ngữ dùng để định nghĩa hoặc giới thiệu chủ ngữ.',
-    usage: params.usage || 'Dùng trong các tình huống trang trọng.',
-    examples: [
-      { id: '1', kr: '저는 학생입니다.', vi: 'Tôi là học sinh.' },
-      { id: '2', kr: '이것은 책입니다.', vi: 'Đây là quyển sách.' },
-    ],
-    similar: params.similar || 'Không có'
+  const grammar = useMemo(() => {
+    if (grammarData && typeof grammarData === 'string') {
+      try {
+        return JSON.parse(grammarData);
+      } catch (e) {
+        console.error("Lỗi parse grammar data:", e);
+        Alert.alert("Lỗi", "Không thể đọc dữ liệu ngữ pháp");
+        return null;
+      }
+    }
+    return null;
+  }, [grammarData]);
+
+  if (!grammar) {
+    return (
+       <SafeAreaView style={styles.safeArea}>
+         <View style={styles.headerNav}>
+             <TouchableOpacity onPress={() => router.back()}><XIcon size={28} /></TouchableOpacity>
+         </View>
+         <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+             <Text>Không tìm thấy dữ liệu ngữ pháp.</Text>
+         </View>
+       </SafeAreaView>
+    )
+  }
+
+  // const grammarData = {
+  //   title: params.title || '-습니다/-습니까?',
+  //   meaning: params.meaning || 'Là...',
+  //   explanation: params.explanation || 'Đuôi câu kính ngữ dùng để định nghĩa hoặc giới thiệu chủ ngữ.',
+  //   usage: params.usage || 'Dùng trong các tình huống trang trọng.',
+  //   examples: [
+  //     { id: '1', kr: '저는 학생입니다.', vi: 'Tôi là học sinh.' },
+  //     { id: '2', kr: '이것은 책입니다.', vi: 'Đây là quyển sách.' },
+  //   ],
+  //   similar: params.similar || 'Không có'
+  // };
+
+  const displayData = {
+    title: grammar.structure || 'Tiêu đề ngữ pháp',
+    meaning: grammar.meaning || 'Nghĩa tiếng Việt',
+    explanation: grammar.explanation || 'Chưa có giải thích chi tiết.',
+    usage: grammar.usage || 'Chưa có thông tin cách dùng.',
+    examples: grammar.exampleSentences || [], // Giả định backend trả về mảng examples
+    similar: grammar.similarGrammar || []
   };
 
   return (
@@ -59,7 +96,7 @@ export default function GrammarDetailScreen() {
           
           {/* Card hiển thị cấu trúc ngữ pháp chính */}
           <View style={styles.mainCard}>
-            <Text style={styles.mainGrammarTitle}>{grammarData.title}</Text>
+            <Text style={styles.mainGrammarTitle}>{displayData.title}</Text>
           </View>
 
           {/* Chi tiết nội dung */}
@@ -67,31 +104,35 @@ export default function GrammarDetailScreen() {
             
             <View style={styles.infoBlock}>
               <Text style={styles.label}>Nghĩa</Text>
-              <Text style={styles.valueBold}>{grammarData.meaning}</Text>
+              <Text style={styles.valueBold}>{displayData.meaning}</Text>
             </View>
 
             <View style={styles.infoBlock}>
               <Text style={styles.label}>Diễn giải</Text>
-              <Text style={styles.valueNormal}>{grammarData.explanation}</Text>
+              <Text style={styles.valueNormal}>{displayData.explanation}</Text>
             </View>
 
             <View style={styles.infoBlock}>
               <Text style={styles.label}>Cách dùng</Text>
-              <Text style={styles.valueNormal}>{grammarData.usage}</Text>
+              <Text style={styles.valueNormal}>{displayData.usage}</Text>
             </View>
 
             <View style={styles.infoBlock}>
               <Text style={styles.label}>Ví dụ</Text>
-              {grammarData.examples.map((ex) => (
-                <Text key={ex.id} style={styles.exampleText}>
-                  • <Text style={styles.exampleKr}>{ex.kr}</Text> / {ex.vi}
+              {displayData.examples.map((ex) => (
+                <Text key={ex._id} style={styles.exampleText}>
+                  • <Text style={styles.exampleKr}>{ex.korean}</Text> / {ex.vietnamese}
                 </Text>
               ))}
             </View>
 
             <View style={styles.similarSection}>
               <Text style={styles.similarLabel}>Ngữ pháp tương tự:</Text>
-              <Text style={styles.similarValue}> • {grammarData.similar}</Text>
+              {displayData.similar.map((si) => (
+                <Text key={si._id} style={styles.exampleText}>
+                  • <Text style={styles.exampleKr}>{si.korean}</Text> / {si.vietnamese}
+                </Text>
+              ))}
             </View>
 
           </View>

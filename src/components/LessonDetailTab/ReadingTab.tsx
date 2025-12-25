@@ -47,52 +47,49 @@ const ReadingTab: React.FC<ReadingTabProps> = ({ lessonId }) => {
   const [hasMore, setHasMore] = useState(true);
 
   // Load readings từ API
-  const loadReadings = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+const loadReadings = useCallback(async (isRefresh = false) => {
+  try {
+    isRefresh ? setRefreshing(true) : setLoading(true);
+    const currentPage = isRefresh ? 1 : page;
 
-      const currentPage = isRefresh ? 1 : page;
-      
-      let response;
-      if (lessonId) {
-        // Lấy readings theo lesson
-        response = await readingService.getReadingsByLesson(lessonId, {
-          search: searchTerm,
-          page: currentPage,
-          limit: 10,
-        });
-      } else {
-        // Lấy tất cả readings
-        response = await readingService.getReadings({
-          search: searchTerm,
-          page: currentPage,
-          limit: 10,
-        });
-      }
+    let readingsData: Reading[] = [];
+    let total = 1;
 
-      if (isRefresh) {
-        setReadings(response.readings);
-        setPage(1);
-      } else {
-        setReadings(prev => [...prev, ...response.readings]);
-      }
-
-      setTotalPages(response.totalPages);
-      setHasMore(currentPage < response.totalPages);
-      
-    } catch (error) {
-      console.error('Error loading readings:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách bài đọc');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    if (lessonId) {
+      // ✅ Trường hợp lấy theo bài học
+      const response = await readingService.getReadingsByLesson(lessonId);
+      // Backend trả về { success: true, readings: [...] }
+      readingsData = Array.isArray(response?.readings) ? response.readings : [];
+      total = 1; // Không phân trang
+    } else {
+      // ✅ Trường hợp lấy danh sách tổng
+      const response = await readingService.getReadings({
+        search: searchTerm,
+        page: currentPage,
+        limit: 10,
+      });
+      readingsData = Array.isArray(response?.readings) ? response.readings : [];
+      total = response?.totalPages ?? 1;
     }
-  }, [lessonId, searchTerm, page]);
 
+    if (isRefresh || lessonId) {
+      // Nếu là theo bài học thì thay thế hoàn toàn, không cộng dồn (prev => [...prev])
+      setReadings(readingsData);
+      if (isRefresh) setPage(1);
+    } else {
+      setReadings(prev => [...prev, ...readingsData]);
+    }
+
+    setTotalPages(total);
+    setHasMore(lessonId ? false : currentPage < total); // Theo bài học thì không có "Load more"
+  } catch (error) {
+    console.error('Error loading readings:', error);
+    Alert.alert('Lỗi', 'Không thể tải danh sách bài đọc');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, [lessonId, searchTerm, page]);
   // Load more data
   const handleLoadMore = () => {
     if (hasMore && !loading) {
@@ -162,12 +159,14 @@ const handleSaveReading = async (readingData: Reading) => {
     // Chuẩn bị data - bỏ tất cả _id trong questions
     const readingForAPI = {
       ...readingData,
-      questions: readingData.questions.map(q => ({
-        question: q.question,
-        options: q.options,
-        answer: q.answer,
-        explanation: q.explanation || ''
-      }))
+    questions: Array.isArray(readingData.questions)
+      ? readingData.questions.map(q => ({
+          question: q.question,
+          options: q.options,
+          answer: q.answer,
+          explanation: q.explanation || '',
+        }))
+      : [],
     };
 
     if (isAdding) {

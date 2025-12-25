@@ -52,20 +52,26 @@ const ListeningTab: React.FC<ListeningTabProps> = ({ lessonId }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   // --- LOGIC GỌI API ---
-  const loadListenings = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await listeningService.getListeningsByLesson(lessonId, {
-        search: searchTerm,
-        limit: 50
-      });
-      setData(response.listenings);
-    } catch (error: any) {
-      Alert.alert('Lỗi', 'Không thể tải danh sách bài nghe');
-    } finally {
-      setLoading(false);
-    }
-  }, [lessonId, searchTerm]);
+const loadListenings = useCallback(async () => {
+  try {
+    setLoading(true);
+
+    const listenings = await listeningService.getListeningsByLesson(lessonId);
+
+    // 🔍 Filter search ở client
+    const filtered = searchTerm
+      ? listenings.filter(item =>
+          item.title.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : listenings;
+
+    setData(filtered);
+  } catch (error) {
+    Alert.alert('Lỗi', 'Không thể tải danh sách bài nghe');
+  } finally {
+    setLoading(false);
+  }
+}, [lessonId, searchTerm]);
 
   useEffect(() => {
     loadListenings();
@@ -92,48 +98,24 @@ const ListeningTab: React.FC<ListeningTabProps> = ({ lessonId }) => {
     }
   };
 
-const handlePlayAudio = async (item: Listening) => {
-  if (!item.audioUrl) return Alert.alert('Thông báo', 'Không có file âm thanh');
-
-  try {
-    // 1. Cấu hình Audio Mode
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      playThroughEarpieceAndroid: false,
-    });
-
-    // 2. Nếu đang phát chính bài này -> Toggle Play/Pause
-    if (playingId === item._id && sound) {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        if (status.isPlaying) {
-          await sound.pauseAsync();
-        } else {
-          await sound.playAsync();
-        }
+  const handlePlayAudio = async (item: Listening) => {
+    if (!item.audioUrl) return Alert.alert('Thông báo', 'Không có file âm thanh');
+    try {
+      if (playingId === item._id && sound) {
+        isPlaying ? await sound.pauseAsync() : await sound.playAsync();
+        return;
       }
-      return;
-    }
+      if (sound) await sound.unloadAsync();
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: item.audioUrl },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate
+      );
+      setSound(newSound);
+      setPlayingId(item._id || null);
+    } catch (e) { Alert.alert('Lỗi', 'Không thể phát âm thanh'); }
+  };
 
-    // 3. Nếu chuyển sang bài khác hoặc khởi tạo lần đầu
-    if (sound) {
-      await sound.unloadAsync();
-    }
-
-    const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: item.audioUrl },
-      { shouldPlay: true },
-      onPlaybackStatusUpdate
-    );
-
-    setSound(newSound);
-    setPlayingId(item._id || null);
-
-  } catch (e) { 
-    console.error(e);
-    Alert.alert('Lỗi', 'Không thể phát âm thanh'); 
-  }
-};
   const handleSeek = async (value: number) => {
     if (sound) await sound.setPositionAsync(value);
   };

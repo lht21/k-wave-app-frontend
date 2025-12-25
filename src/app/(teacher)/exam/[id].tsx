@@ -899,7 +899,6 @@ const TeacherExamsDetail: React.FC = () => {
               title="Thêm câu hỏi đầu tiên" 
               variant="secondary" 
               onPress={() => openModal(selectedSection, 'add')}
-              style={{marginTop: 12}} 
               disabled={loading}
             />
           </View>
@@ -939,7 +938,7 @@ const TeacherExamsDetail: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.light.background, marginBottom: 40 },
+  container: { flex: 1, backgroundColor: colors.light.background, marginBottom: 40, marginTop: 40 },
   center: { justifyContent: 'center', alignItems: 'center' },
   
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderColor: colors.light.border, gap: 12 },

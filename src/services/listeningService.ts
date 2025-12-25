@@ -2,6 +2,7 @@
 import API_BASE_URL from '../api/api';
 import { authService } from './authService';
 
+// --- CÁC INTERFACE CƠ BẢN ---
 export interface ListeningQuestion {
   question: string;
   options: string[];
@@ -22,15 +23,11 @@ export interface Listening {
     code: string;
     level: string;
   };
-  author?: {
-    _id: string;
-    name: string;
-    email: string;
-  };
   duration: number;
   difficulty: string;
   tags: string[];
   questions: ListeningQuestion[];
+  // Các trường thống kê
   playCount?: number;
   attemptCount?: number;
   averageScore?: number;
@@ -47,6 +44,27 @@ export interface ListeningResponse {
   total: number;
 }
 
+// --- 👇 CÁC INTERFACE MỚI CHO PHẦN NỘP BÀI (TƯƠNG TỰ READING) ---
+export interface ListeningResultDetail {
+  questionId: string;
+  userAnswer: number;
+  correctAnswer: number;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
+export interface ListeningSubmissionResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    score: number;
+    correctCount: number;
+    totalQuestions: number;
+    results: ListeningResultDetail[];
+    passed: boolean;
+  };
+}
+
 class ListeningService {
   private async fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
     const token = await authService.getToken();
@@ -57,13 +75,21 @@ class ListeningService {
       ...options.headers,
     };
 
-    console.log('🌐 Listening Service - Making request to:', url);
+    // console.log('🌐 Listening Service - Making request to:', url);
 
     const response = await fetch(url, { ...options, headers });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Request failed');
+      // Xử lý lỗi an toàn hơn, tránh crash nếu server trả về HTML lỗi
+      const responseText = await response.text();
+      let errorMessage = 'Request failed';
+      try {
+          const errorJson = JSON.parse(responseText);
+          errorMessage = errorJson.message || errorMessage;
+      } catch {
+          errorMessage = responseText.substring(0, 100);
+      }
+      throw new Error(errorMessage);
     }
     
     return response.json();
@@ -117,20 +143,12 @@ class ListeningService {
   }
 
   // GET: Lấy listening theo lesson
-  async getListeningsByLesson(lessonId: string, params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }): Promise<ListeningResponse> {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit?.toString() || '20');
-    if (params?.search) queryParams.append('search', params.search || '');
-    
-    const url = `${API_BASE_URL}/listening/lesson/${lessonId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return this.fetchWithAuth<ListeningResponse>(url);
+  async getListeningsByLesson(lessonId: string): Promise<Listening[]> {
+    const url = `${API_BASE_URL}/listening/lesson/${lessonId}`;
+    const response = await this.fetchWithAuth<{ success: boolean; data: Listening[] }>(url);
+    return response.data;
   }
-
+  
   // POST: Tạo listening cho lesson
   async createListeningForLesson(lessonId: string, listeningData: Omit<Listening, '_id' | 'lesson' | 'level'> & { level?: string }): Promise<Listening> {
     return this.fetchWithAuth<Listening>(`${API_BASE_URL}/listening/lesson/${lessonId}`, {
@@ -149,84 +167,46 @@ class ListeningService {
     return this.fetchWithAuth<string[]>(`${API_BASE_URL}/listening/tags`);
   }
 
-  // POST: Upload audio
-// services/listeningService.ts - SỬA HÀM uploadAudio
-async uploadAudio(formData: FormData): Promise<any> {
-  try {
-    const token = await authService.getToken();
-    const url = `${API_BASE_URL}/listening/upload`;
-    
-    console.log('🌐 Upload Audio Details:');
-    console.log('  URL:', url);
-    console.log('  Token exists:', !!token);
-    
-    // Test server connection first
-    console.log('🔍 Testing server...');
+  // POST: Upload audio (Giữ nguyên logic upload phức tạp của bạn)
+  async uploadAudio(formData: FormData): Promise<any> {
     try {
-      const testResponse = await fetch(API_BASE_URL.replace('/listening/upload', '/test'));
-      const testData = await testResponse.text();
-      console.log('✅ Server test:', testResponse.status, testData.substring(0, 50));
-    } catch (testError) {
-      console.error('❌ Server test failed:', testError);
-    }
-    
-    // Prepare headers
-    const headers: HeadersInit = {
-      'Authorization': `Bearer ${token}`,
-      // DO NOT set Content-Type for FormData - browser will set it with boundary
-    };
-    
-    console.log('📤 Starting upload...');
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+      const token = await authService.getToken();
+      const url = `${API_BASE_URL}/listening/upload`;
+      
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+      };
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
 
-    console.log('📡 Upload response status:', response.status);
-    console.log('📡 Upload response ok:', response.ok);
-    
-    // Get response as text first to debug
-    const responseText = await response.text();
-    console.log('📡 Response text (first 200 chars):', responseText.substring(0, 200));
-    
-    // Try to parse as JSON
-    try {
-      const data = JSON.parse(responseText);
-      console.log('✅ Parsed response:', data);
+      const responseText = await response.text();
       
-      if (!response.ok) {
-        throw new Error(data.message || `Upload failed: ${response.status}`);
+      try {
+        const data = JSON.parse(responseText);
+        if (!response.ok) {
+          throw new Error(data.message || `Upload failed: ${response.status}`);
+        }
+        return data;
+      } catch (parseError) {
+        if (responseText.includes('<html')) {
+          throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}.`);
+        }
+        throw new Error(`Server returned invalid response: ${responseText.substring(0, 100)}`);
       }
       
-      return data;
-    } catch (parseError) {
-      console.error('❌ Failed to parse JSON:', parseError);
-      
-      // Check if it's HTML error page
-      if (responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Check if endpoint exists.`);
+    } catch (error: any) {
+      console.error('❌ Upload error:', error);
+      if (error.message.includes('Network request failed')) {
+        throw new Error(`Không thể kết nối đến server ${API_BASE_URL}.`);
       }
-      
-      throw new Error(`Server returned invalid response: ${responseText.substring(0, 100)}`);
+      throw error;
     }
-    
-  } catch (error: any) {
-    console.error('❌ Upload catch error details:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack?.split('\n')[0]
-    });
-    
-    // Re-throw with better error message
-    if (error.message.includes('Network request failed')) {
-      throw new Error(`Không thể kết nối đến server ${API_BASE_URL}. Kiểm tra:\n1. Server có đang chạy?\n2. Đúng IP?`);
-    }
-    
-    throw error;
   }
-}
+
   // POST: Tạo nhiều listening cùng lúc
   async bulkCreateListenings(listenings: Omit<Listening, '_id' | 'isActive' | 'playCount' | 'attemptCount' | 'averageScore' | 'successRate'>[], lessonId?: string): Promise<any> {
     return this.fetchWithAuth(`${API_BASE_URL}/listening/bulk-create`, {
@@ -243,12 +223,46 @@ async uploadAudio(formData: FormData): Promise<any> {
     });
   }
 
-  // POST: Nộp bài listening
-  async submitListening(listeningId: string, answers: any[]): Promise<any> {
-    return this.fetchWithAuth(`${API_BASE_URL}/listening/${listeningId}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({ answers }),
-    });
+  // --- 👇 HÀM ĐÃ SỬA ĐỔI: TƯƠNG TỰ submitReading ---
+  /**
+   * Nộp bài Listening
+   * @param listeningId ID bài nghe
+   * @param lessonId ID bài học (để update progress)
+   * @param answers Object map { "questionId": selectedIndex }
+   */
+  async submitListening(
+    listeningId: string, 
+    lessonId: string, 
+    answers: Record<string, number>
+  ): Promise<ListeningSubmissionResponse> {
+    try {
+      // 1. Kiểm tra ID
+      if (!listeningId || !lessonId) throw new Error("Missing ID: listeningId or lessonId");
+
+      const token = await authService.getToken();
+      
+      // 2. Gọi API
+      const response = await fetch(`${API_BASE_URL}/listening/${listeningId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lessonId, answers }),
+      });
+
+      const data = await response.json();
+      
+      // 3. Xử lý lỗi từ server
+      if (!response.ok) {
+        throw new Error(data.message || 'Submission failed');
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Submit listening error:', error);
+      throw error;
+    }
   }
 
   // GET: Lấy tiến độ

@@ -11,7 +11,7 @@ import {
   StatusBar,
   Pressable,
 } from 'react-native';
-import { XIcon } from 'phosphor-react-native';
+import { SpeakerHighIcon, XIcon } from 'phosphor-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 // --- Reanimated & Gesture Handler Imports ---
@@ -29,6 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {vocabularyService} from '../../../../services/vocabularyService';
 import { ActivityIndicator } from 'react-native-paper';
 import { lessonProgressService } from '../../../../services/lessonProgressService';
+import * as Speech from 'expo-speech';
 
 const { width, height } = Dimensions.get('window');
 
@@ -96,6 +97,11 @@ export default function FlashcardScreen() {
     };
     fetchFlashCards();
   }, [id]);
+
+  // 4. Hàm phát âm (TTS)
+  const speak = (text: string) => {
+    Speech.speak(text, { language: 'ko-KR' });
+  };
 
   const resetPosition = useCallback(() => {
     'worklet';
@@ -293,6 +299,9 @@ export default function FlashcardScreen() {
 
           {/* Badges / Tags (Cập nhật theo dữ liệu động) */}
           <View style={styles.badgeRow}>
+            <TouchableOpacity onPress={() => speak(currentCard.word)} style={[styles.badge, { backgroundColor: COLORS.mintBadge }]}>
+              <SpeakerHighIcon size={24} color={COLORS.textDark} weight="regular" />
+            </TouchableOpacity>
             <View style={[styles.badge, { backgroundColor: COLORS.pinkBadge }]}>
               <Text style={styles.badgeText}>{currentCard.type}</Text>
             </View>
@@ -402,7 +411,7 @@ const styles = StyleSheet.create({
   meaningText: { fontSize: 32, fontWeight: '700', color: COLORS.primaryGreen },
 
   // --- Giữ nguyên các styles footer, badges, examples ---
-  badgeRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 30, gap: 15 },
+  badgeRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 30, gap: 15, alignItems: 'center' },
   badge: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12 },
   badgeText: { fontSize: 14, fontWeight: '700', color: COLORS.textDark },
   exampleSection: { marginTop: 25 },

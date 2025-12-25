@@ -66,33 +66,10 @@ class ReadingService {
     return response.json();
   }
 
-  // GET: Lấy bài đọc theo lesson
-  async getReadingsByLesson(
-    lessonId: string, 
-    params?: {
-      search?: string;
-      page?: number;
-      limit?: number;
-      difficulty?: string;
-    }
-  ): Promise<ReadingResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params?.search) queryParams.append('search', params.search);
-      if (params?.page) queryParams.append('page', params.page.toString());
-      if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.difficulty) queryParams.append('difficulty', params.difficulty);
-      
-      const url = `${API_BASE_URL}/readings/lesson/${lessonId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      console.log('📚 Fetching readings for lesson:', lessonId);
-      return await this.fetchWithAuth<ReadingResponse>(url);
-    } catch (error) {
-      console.error('Error fetching readings:', error);
-      throw error;
-    }
-  }
-
+async getReadingsByLesson(lessonId: string): Promise<{ success: boolean; readings: Reading[] }> {
+  const url = `${API_BASE_URL}/readings/lesson/${lessonId}`;
+  return this.fetchWithAuth<{ success: boolean; readings: Reading[] }>(url);
+}
   // POST: Tạo bài đọc cho lesson
   async createReadingForLesson(lessonId: string, readingData: Omit<Reading, '_id' | 'lesson' | 'author'>): Promise<Reading> {
     const url = `${API_BASE_URL}/readings/lesson/${lessonId}`;

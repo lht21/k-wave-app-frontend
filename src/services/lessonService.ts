@@ -100,8 +100,7 @@ class LessonService {
     const url = `${API_BASE_URL}/lessons${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return this.fetchWithAuth<LessonsResponse>(url);
   }
-
-  // GET: Lấy bài học của user hiện tại
+// GET: Lấy bài học của user hiện tại
 async getMyLessons(params?: {
   level?: string;
   status?: string;
@@ -119,13 +118,28 @@ async getMyLessons(params?: {
   if (params?.status) queryParams.append('status', params.status);
   if (params?.page) queryParams.append('page', params.page.toString());
   if (params?.limit) queryParams.append('limit', params.limit.toString());
-
-  const url = `${API_BASE_URL}/lessons/my${
+const url = `${API_BASE_URL}/lessons/my${
     queryParams.toString() ? `?${queryParams.toString()}` : ''
   }`;
 
   return this.fetchWithAuth(url);
 }
+  // GET: Lấy tất cả bài học dành cho học sinh
+  async getLessonsForStudent(params?: {
+    level?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<LessonsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.level) queryParams.append('level', params.level);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page?.toString() || '1');
+    if (params?.limit) queryParams.append('limit', params.limit?.toString() || '10');
+
+    const url = `${API_BASE_URL}/lessons/mode/student${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.fetchWithAuth<LessonsResponse>(url);
+  }
 
   // GET: Lấy bài học theo ID
   async getLessonById(id: string): Promise<Lesson> {
