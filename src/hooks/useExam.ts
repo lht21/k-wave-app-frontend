@@ -17,6 +17,16 @@ export const useExam = () => {
       const errorMsg = err.message || 'Lỗi khi tải danh sách đề thi';
       setError(errorMsg);
       console.error('Error fetching exams:', err);
+      
+      // Show alert for token expired
+      if (errorMsg.includes('hết hạn') || errorMsg.includes('đăng nhập lại')) {
+        Alert.alert(
+          'Phiên đã hết hạn',
+          'Vui lòng đăng nhập lại để tiếp tục.',
+          [{ text: 'OK' }]
+        );
+      }
+      
       throw err;
     } finally {
       setLoading(false);

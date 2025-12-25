@@ -123,6 +123,8 @@ class ExamService {
   private async fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
     const token = await authService.getToken();
     
+    console.log('🔑 Exam Service - Token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
+    
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -130,11 +132,23 @@ class ExamService {
     };
 
     console.log('🌐 Exam Service - Request:', url, options.method || 'GET');
+    console.log('📋 Exam Service - Headers:', JSON.stringify(headers, null, 2));
 
     const response = await fetch(url, { ...options, headers });
     
+    console.log('📥 Exam Service - Response status:', response.status);
+    
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      console.error('❌ Exam Service - Error response:', error);
+      
+      // Handle token expired - auto logout
+      if (response.status === 401) {
+        console.warn('🔓 Token expired or invalid - logging out');
+        await authService.logout();
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      
       throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
     }
     

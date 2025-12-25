@@ -6,7 +6,7 @@ const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV ==
 // Get appropriate localhost URL based on platform
 const getDevApiUrl = () => {
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';  // Android emulator
+    return 'http://192.168.1.9:5000/api';  // Android emulator
   } else if (Platform.OS === 'ios') {
     return 'http://localhost:5000/api';  // iOS simulator
   }
@@ -17,8 +17,8 @@ const API_BASE_URL = isDev
   ? getDevApiUrl()
   : 'https://your-production-api.com/api';
 
-// Timeout for API requests (10 seconds)
-const API_TIMEOUT = 10000;
+// Timeout for API requests (30 seconds)
+const API_TIMEOUT = 30000;
 
 // Helper function to add timeout to fetch requests
 const fetchWithTimeout = async (url: string, options: RequestInit = {}): Promise<Response> => {

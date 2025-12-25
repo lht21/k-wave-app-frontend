@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
         return 'http://localhost:5000/api';
     } else {
         // Mobile environment - try network IP first
-        return 'http://192.168.1.14:5000/api';
+        return 'http://192.168.1.9:5000/api';
     }
 };
 
@@ -25,9 +25,9 @@ interface LessonsParams {
 
 class LessonApiService {
     private static readonly FALLBACK_URLS = [
+        'http://192.168.1.9:5000/api',
         'http://localhost:5000/api',
-        'http://192.168.1.14:5000/api', 
-        'http://10.0.2.2:5000/api'
+        'http://192.168.1.14:5000/api'
     ];
 
     // Helper method to create fetch with timeout and retry

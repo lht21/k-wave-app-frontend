@@ -8,20 +8,16 @@ import {
   Image,
   TextInput 
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { spacing } from '../../theme/spacing';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-import { RootStackParamList } from '../../types/navigation';
-
-type VideoCategoryNavigationProp = StackNavigationProp<RootStackParamList>;
-type VideoCategoryRouteProp = RouteProp<RootStackParamList, 'VideoCategory'>;
 
 const VideoCategory: React.FC = () => {
-  const navigation = useNavigation<VideoCategoryNavigationProp>();
-  const route = useRoute<VideoCategoryRouteProp>();
-  const { categoryId, categoryTitle } = route.params;
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const categoryId = params.categoryId as string;
+  const categoryTitle = params.categoryTitle as string;
   
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -88,9 +84,12 @@ const VideoCategory: React.FC = () => {
   );
 
   const handleVideoPress = (video: any) => {
-    navigation.navigate('VideoDetail', {
-      videoId: video.id,
-      videoTitle: video.title
+    router.push({
+      pathname: '/(student)/video-detail',
+      params: {
+        videoId: video.id,
+        videoTitle: video.title
+      }
     });
   };
 
@@ -154,7 +153,7 @@ const VideoCategory: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
