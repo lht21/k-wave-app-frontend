@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -45,7 +46,7 @@ const examTypes: { id: ExamType; label: string }[] = [
 ];
 
 const TeacherExamsScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<TeacherStackParamList>>();
+    const router = useRouter(); 
   const [selectedType, setSelectedType] = useState<ExamType>('topik1');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [exams, setExams] = useState<Exam[]>([]);
@@ -125,7 +126,7 @@ const handleQuickCreate = async () => {
   };
 
   const handleViewDetail = (examId: string) => {
-    navigation.navigate('ExamDetail', { examId });
+    router.push(`/(teacher)/exam/${examId}`);
   };
 
   const toggleSortOrder = () => {

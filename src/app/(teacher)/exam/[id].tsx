@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -125,9 +126,9 @@ const SimpleAudioPlayer = ({
 };
 
 const TeacherExamsDetail: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<TeacherStackParamList>>();
-  const route = useRoute<ExamDetailRouteProp>();
-  const { examId } = route.params;
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>(); 
+  const examId = id; 
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [selectedSection, setSelectedSection] = useState<SectionType>('listening');
@@ -191,7 +192,7 @@ const TeacherExamsDetail: React.FC = () => {
     } catch (error) {
       console.error('Error loading exam detail:', error);
       Alert.alert('Lỗi', 'Không thể tải chi tiết đề thi');
-      navigation.goBack();
+      router.back();
     } finally {
       setIsLoading(false);
     }
@@ -756,7 +757,7 @@ const TeacherExamsDetail: React.FC = () => {
         <TouchableOpacity onPress={() => {
           // Dừng nhạc khi quay lại
           unloadSound();
-          navigation.goBack();
+          router.back();
         }} style={styles.backBtn}>
           <HugeiconsIcon icon={ArrowLeft01Icon} size={24} color={colors.light.text} />
         </TouchableOpacity>

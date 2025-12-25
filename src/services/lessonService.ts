@@ -1,6 +1,9 @@
 // src/services/lessonService.ts
 import API_BASE_URL from '../api/api';
 import { authService } from './authService';
+import { Vocabulary } from './vocabularyService'; 
+import { Listening } from './listeningService';
+import { Grammar } from './grammarService'; 
 
 export interface Lesson {
   _id?: string;
@@ -18,7 +21,9 @@ export interface Lesson {
     name: string;
     email: string;
   };
-  
+  vocabulary?: Vocabulary[];
+  grammar?: Grammar[];
+  listening?: Listening[];
 }
 
 export interface LessonsResponse {

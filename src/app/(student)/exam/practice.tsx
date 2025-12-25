@@ -257,14 +257,14 @@ export default function PracticeExam() {
       
       // Thay thế localhost bằng IP thực vì điện thoại không thể truy cập localhost
       if (audioUri.includes('localhost')) {
-        audioUri = audioUri.replace('localhost', '192.168.1.9');
+        audioUri = audioUri.replace('localhost', '192.168.1.89');
         console.log('🔄 Replaced localhost with IP:', audioUri);
       }
       
       // Nếu URL không bắt đầu bằng http, thêm base URL
       if (!audioUri.startsWith('http://') && !audioUri.startsWith('https://')) {
         // Nếu là đường dẫn tương đối, thêm base URL
-        const baseUrl = 'http://192.168.1.9:5000'; // Lấy từ API_BASE_URL
+        const baseUrl = 'http://192.168.1.89:5000'; // Lấy từ API_BASE_URL
         audioUri = audioUri.startsWith('/') ? `${baseUrl}${audioUri}` : `${baseUrl}/${audioUri}`;
       }
 

@@ -2,7 +2,7 @@
 // Check if we're in development mode (React Native)
 const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
 
-export const API_BASE_URL =  'http://192.168.1.9:5000/api'
+export const API_BASE_URL =  'http://192.168.1.89:5000/api'
 // For iOS simulator, use: http://localhost:5000/api
 // For physical device, use your computer's IP: http://192.168.1.XXX:5000/api
 

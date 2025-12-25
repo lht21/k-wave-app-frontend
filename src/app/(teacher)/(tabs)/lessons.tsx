@@ -9,6 +9,7 @@ import {
   StatusBar,
   TouchableOpacity 
 } from 'react-native';
+import { useRouter } from 'expo-router';
 // Giữ nguyên các component chứa logic và dữ liệu thật của bạn
 import CourseList from '../../../components/CourseList/CourseList';
 import TeacherLessonTable from '../../../components/Teacher/TeacherLessonTable';
@@ -26,12 +27,16 @@ const UI_COLORS = {
 };
 
 const TeacherLessonsScreen = () => {
+    const router = useRouter(); 
     // LOGIC GỐC: Giữ nguyên state quản lý Level
     const [selectedLevel, setSelectedLevel] = useState('Sơ cấp 1');
 
     // LOGIC GỐC: Giữ nguyên hàm xử lý chọn khóa học
     const handleCourseSelect = (course: { level: string }) => {
         setSelectedLevel(course.level);
+    };
+    const handleViewLessonDetail = (lessonId: string) => {
+        router.push(`/(teacher)/lesson/${lessonId}`);
     };
 
     return (

@@ -14,7 +14,6 @@ const HomeStd: React.FC = () => {
   const { user } = useAuth();
   const router = useRouter();
 
-  // Giữ nguyên Logic Data
   const learningModules = [
     { id: '1', title: 'Lộ trình', icon: '🛣️', navigateTo: '/(student)/roadmap/roadmap' },
     { id: '2', title: 'Thi thử', icon: '🎯', navigateTo: '/(student)/exam/trial' },
@@ -24,15 +23,15 @@ const HomeStd: React.FC = () => {
     { id: '6', title: 'Tin tức', icon: '📰', navigateTo: '/(student)/news/news' }
   ]
 
+  // Sửa title khớp hoàn toàn với danh sách trong StdCulture
   const cultureCategories = [
-    { id: '1', title: 'Văn hoá lịch sử', icon: '🏯' },
-    { id: '2', title: 'Văn hoá trang phục', icon: '👘' },
-    { id: '3', title: 'Văn hoá âm nhạc', icon: '🎵' },
-    { id: '4', title: 'Văn hoá ẩm thực', icon: '🍜' },
-    { id: '5', title: 'Văn hoá điện ảnh', icon: '🎬' },
+    { id: '1', title: 'Du lịch', icon: '🛩️' },
+    { id: '2', title: 'Làm đẹp', icon: '👜' },
+    { id: '3', title: 'Âm nhạc', icon: '🎵' },
+    { id: '4', title: 'Ẩm thực', icon: '🍳' },
+    { id: '5', title: 'Điện ảnh', icon: '📽️' },
   ]
 
-  // Component phụ trợ cho Grid 2 cột mới
   const LearningModule = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.moduleCard}
@@ -41,7 +40,6 @@ const HomeStd: React.FC = () => {
       <View style={styles.moduleTextContainer}>
         <Text style={styles.moduleTitleText}>{item.title}</Text>
       </View>
-      {/* Decorative Icon Background giống thiết kế */}
       <View style={styles.moduleDecor}>
          <View style={styles.decorCircle} />
          <Text style={styles.decorIcon}>{item.icon}</Text> 
@@ -52,7 +50,10 @@ const HomeStd: React.FC = () => {
   const CultureItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.cultureRow}
-      onPress={() => router.push('/(student)/culture/culture-list')}
+      onPress={() => router.push({
+        pathname: '/(student)/culture/culture-list',
+        params: { category: item.title } // Truyền title sang để filter
+      })}
     >
       <View style={styles.cultureIconCircle}>
         <Text style={{ fontSize: 20 }}>{item.icon}</Text>
@@ -64,7 +65,6 @@ const HomeStd: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* Custom Header Section */}
       <View style={styles.headerContainer}>
         <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
@@ -81,7 +81,6 @@ const HomeStd: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Section 1: Khám phá */}
         <Text style={styles.sectionTitle}>Khám phá học tập</Text>
         <View style={styles.grid}>
           {learningModules.map((item) => (
@@ -89,7 +88,6 @@ const HomeStd: React.FC = () => {
           ))}
         </View>
 
-        {/* Section 2: Premium Banner */}
         <Text style={styles.sectionTitle}>Trải nghiệm Premium</Text>
         <LinearGradient
           colors={['#E8FBF2', '#C2F3D9']}
@@ -101,16 +99,12 @@ const HomeStd: React.FC = () => {
             <Text style={styles.premiumTitle}>Học tiếng Hàn dễ dàng!</Text>
             <Text style={styles.premiumSubtitle}>Seoul trong tầm tay</Text>
           </View>
-          
           <TouchableOpacity style={styles.premiumBtn} onPress={() => router.push('/(student)/premium/update')}>
             <Text style={styles.premiumBtnText}>Đăng ký ngay!</Text>
           </TouchableOpacity>
-          
-          {/* Abstract circles for UI */}
           <View style={[styles.absCircle, { bottom: -20, left: -20, backgroundColor: '#A8E7C5' }]} />
         </LinearGradient>
 
-        {/* Section 3: Văn hoá */}
         <Text style={styles.sectionTitle}>Văn hoá Hàn Quốc</Text>
         {cultureCategories.map((item) => (
           <CultureItem key={item.id} item={item} />

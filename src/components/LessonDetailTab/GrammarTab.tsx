@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// src/components/LessonDetailTab/GrammarTab.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,74 +22,96 @@ import {
 } from '@hugeicons/core-free-icons';
 
 import Button from '../../components/Button/Button';
+import ModalGrammar from '../Modal/ModalGrammar';
 import { colors, palette } from '../../theme/colors';
 import { typography } from '../../theme/typography';
-import { Grammar } from '../../services/grammarService';
+import { grammarService, Grammar } from '../../services/grammarService';
 
-// Định nghĩa Props tương tự VocabularyTab
 interface GrammarTabProps {
-  grammar?: Grammar[];
-  loading?: boolean;
-  searchTerm?: string;
-  onSearchChange?: (value: string) => void;
-  onAddGrammar?: () => void;
-  onEditGrammar?: (grammar: Grammar) => void;
-  onDeleteGrammar?: (grammarId: string) => void;
+  lessonId: string; 
+  lessonLevel?: string; 
 }
 
 const GrammarTab: React.FC<GrammarTabProps> = ({
-  grammar = [],
-  loading = false,
-  searchTerm = '',
-  onSearchChange = () => {},
-  onAddGrammar = () => {},
-  onEditGrammar = () => {},
-  onDeleteGrammar = () => {},
+  lessonId, 
+  lessonLevel = 'Sơ cấp 1',
 }) => {
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [data, setData] = useState<Grammar[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingGrammar, setEditingGrammar] = useState<Grammar | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Logic lọc local để UI mượt mà (Tương tự VocabularyTab)
-  const filteredGrammar = useMemo(() => {
-    return grammar.filter(item => 
-      item.structure.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
-      item.meaning.toLowerCase().includes(localSearchTerm.toLowerCase()) ||
-      item.explanation.toLowerCase().includes(localSearchTerm.toLowerCase())
-    );
-  }, [grammar, localSearchTerm]);
+  // Tải dữ liệu ngữ pháp
+  const loadGrammar = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await grammarService.getGrammarByLesson(lessonId, {
+        search: searchTerm,
+        limit: 50
+      });
+      setData(response.grammar);
+    } catch (error: any) {
+      console.error('Error loading grammar:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách ngữ pháp');
+    } finally {
+      setLoading(false);
+    }
+  }, [lessonId, searchTerm]);
 
-  // 2. Xử lý Debounce search
-  const handleSearchChange = useCallback((text: string) => {
-    setLocalSearchTerm(text);
-    if (debounceTimer) clearTimeout(debounceTimer);
-    
-    const timer = setTimeout(() => {
-      onSearchChange(text);
-    }, 500);
-    setDebounceTimer(timer);
-  }, [debounceTimer, onSearchChange]);
-
-  // Sync local state khi prop từ cha thay đổi
   useEffect(() => {
-    setLocalSearchTerm(searchTerm);
-  }, [searchTerm]);
+    loadGrammar();
+  }, [loadGrammar]);
 
-  const handleDeletePress = (grammarId: string, structure: string): void => {
-    Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa ngữ pháp "${structure}"?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => onDeleteGrammar(grammarId),
-        },
-      ]
-    );
+  const handleAddGrammar = () => {
+    setEditingGrammar(null);
+    setIsAdding(true);
+    setIsModalOpen(true);
   };
 
-  const renderGrammarCard = (item: Grammar): React.ReactElement => (
+  const handleEditGrammar = (item: Grammar) => {
+    setEditingGrammar(item);
+    setIsAdding(false);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteGrammar = async (grammarId: string) => {
+    Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa ngữ pháp này?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await grammarService.deleteGrammar(grammarId);
+            Alert.alert('Thành công', 'Đã xóa ngữ pháp');
+            loadGrammar();
+          } catch (error: any) {
+            Alert.alert('Lỗi', 'Không thể xóa ngữ pháp');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSaveGrammar = async (grammarData: Grammar) => {
+    try {
+      if (isAdding) {
+        await grammarService.createGrammarForLesson(lessonId, grammarData);
+        Alert.alert('Thành công', 'Đã thêm ngữ pháp mới');
+      } else if (editingGrammar?._id) {
+        await grammarService.updateGrammar(editingGrammar._id, grammarData);
+        Alert.alert('Thành công', 'Đã cập nhật ngữ pháp');
+      }
+      loadGrammar();
+      setIsModalOpen(false);
+    } catch (error: any) {
+      Alert.alert('Lỗi', 'Không thể lưu dữ liệu');
+    }
+  };
+
+  const renderGrammarCard = (item: Grammar) => (
     <View key={item._id} style={styles.grammarCard}>
       <View style={styles.cardHeader}>
         <View style={styles.structureContainer}>
@@ -97,17 +120,16 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
             <Text style={styles.levelText}>{item.level}</Text>
           </View>
         </View>
-        
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => onEditGrammar(item)}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.editButton]} 
+            onPress={() => handleEditGrammar(item)}
           >
             <HugeiconsIcon icon={Edit01Icon} size={18} color={palette.warning} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => item._id && handleDeletePress(item._id, item.structure)}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton]} 
+            onPress={() => item._id && handleDeleteGrammar(item._id)}
           >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={palette.error} />
           </TouchableOpacity>
@@ -117,17 +139,12 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
       <View style={styles.infoSection}>
         <View style={styles.sectionHeader}>
           <HugeiconsIcon icon={InformationDiamondIcon} size={16} color={colors.light.primary} />
-          <Text style={styles.sectionTitle}>Thông tin</Text>
+          <Text style={styles.sectionTitle}>Thông tin ngữ pháp</Text>
         </View>
         <View style={styles.infoGrid}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nghĩa:</Text>
-            <Text style={styles.infoValue}>{item.meaning}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Giải thích:</Text>
-            <Text style={styles.infoValue}>{item.explanation}</Text>
-          </View>
+          <View style={styles.infoRow}><Text style={styles.infoLabel}>Nghĩa:</Text><Text style={styles.infoValue}>{item.meaning}</Text></View>
+          <View style={styles.infoRow}><Text style={styles.infoLabel}>Giải thích:</Text><Text style={styles.infoValue}>{item.explanation}</Text></View>
+          {item.usage && <View style={styles.infoRow}><Text style={styles.infoLabel}>Cách dùng:</Text><Text style={styles.infoValue}>{item.usage}</Text></View>}
         </View>
       </View>
 
@@ -135,10 +152,10 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
         <View style={styles.examplesSection}>
           <View style={styles.sectionHeader}>
             <HugeiconsIcon icon={LicenseDraftIcon} size={16} color={palette.success} />
-            <Text style={styles.sectionTitle}>Ví dụ</Text>
+            <Text style={styles.sectionTitle}>Ví dụ minh họa</Text>
           </View>
-          {item.exampleSentences.slice(0, 2).map((ex, idx) => (
-            <View key={idx} style={styles.exampleMiniCard}>
+          {item.exampleSentences.map((ex, idx) => (
+            <View key={idx} style={styles.exampleCard}>
               <Text style={styles.exampleKorean}>{ex.korean}</Text>
               <Text style={styles.exampleVietnamese}>{ex.vietnamese}</Text>
             </View>
@@ -148,15 +165,6 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.light.primary} />
-        <Text style={styles.loadingText}>Đang tải ngữ pháp...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -165,73 +173,70 @@ const GrammarTab: React.FC<GrammarTabProps> = ({
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm kiếm ngữ pháp..."
-            value={localSearchTerm}
-            onChangeText={handleSearchChange}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
           />
         </View>
         <Button
-          title=""
+          title="Thêm"
           variant="primary"
-          onPress={onAddGrammar}
-          leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color={colors.light.background} />}
+          size="small"
+          onPress={handleAddGrammar}
+          leftIcon={<HugeiconsIcon icon={Add01Icon} size={16} color="white" />}
         />
       </View>
 
-      <View style={styles.content}>
-        {filteredGrammar.length > 0 ? (
-          <ScrollView 
-            style={styles.scrollView} 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {filteredGrammar.map(renderGrammarCard)}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{localSearchTerm ? 'Không tìm thấy' : 'Chưa có ngữ pháp'}</Text>
-            {!localSearchTerm && <Button title="Thêm ngữ pháp" variant="primary" onPress={onAddGrammar} size="small" />}
-          </View>
-        )}
-      </View>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 20 }} color={colors.light.primary} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {data.length > 0 ? data.map(renderGrammarCard) : (
+            <View style={styles.emptyState}><Text>Chưa có dữ liệu ngữ pháp</Text></View>
+          )}
+        </ScrollView>
+      )}
+
+      <ModalGrammar
+        isVisible={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        grammar={editingGrammar}
+        onSave={handleSaveGrammar}
+        isAdding={isAdding}
+        lessonLevel={lessonLevel}
+      />
     </View>
   );
 };
 
-// ... Styles giữ nguyên từ GrammarTab cũ của bạn hoặc chỉnh sửa cho gọn ...
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.light.background },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 12, fontSize: typography.fontSizes.md, color: colors.light.textSecondary },
-    header: { flexDirection: 'row', padding: 16, gap: 12, alignItems: 'center' },
-    searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: colors.light.border, borderRadius: 24, backgroundColor: colors.light.card },
-    searchIcon: { marginRight: 8 },
-    searchInput: { flex: 1, paddingVertical: 10, fontSize: typography.fontSizes.sm, color: colors.light.text },
-    content: { flex: 1 },
-    scrollView: { flex: 1 },
-    scrollContent: { padding: 16, gap: 16 },
-    grammarCard: { backgroundColor: colors.light.card, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.light.border, elevation: 2 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-    structureContainer: { flex: 1 },
-    structureText: { fontSize: typography.fontSizes.lg, fontFamily: typography.fonts.bold, color: colors.light.text },
-    levelBadge: { backgroundColor: colors.light.primary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginTop: 4 },
-    levelText: { fontSize: typography.fontSizes.xs, color: colors.light.primary, fontFamily: typography.fonts.semiBold },
-    actionButtons: { flexDirection: 'row', gap: 8 },
-    actionButton: { padding: 6, borderRadius: 6 },
-    editButton: { backgroundColor: palette.warning + '15' },
-    deleteButton: { backgroundColor: palette.error + '15' },
-    infoSection: { marginBottom: 12 },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-    sectionTitle: { fontSize: typography.fontSizes.sm, fontFamily: typography.fonts.semiBold, color: colors.light.text },
-    infoGrid: { gap: 4 },
-    infoRow: { flexDirection: 'row' },
-    infoLabel: { fontSize: typography.fontSizes.xs, color: colors.light.textSecondary, width: 70 },
-    infoValue: { fontSize: typography.fontSizes.xs, color: colors.light.text, flex: 1 },
-    examplesSection: { borderTopWidth: 1, borderTopColor: colors.light.border + '50', paddingTop: 12 },
-    exampleMiniCard: { marginBottom: 8 },
-    exampleKorean: { fontSize: typography.fontSizes.xs, color: colors.light.text, fontFamily: typography.fonts.regular },
-    exampleVietnamese: { fontSize: typography.fontSizes.xs, color: colors.light.textSecondary },
-    emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-    emptyTitle: { fontSize: typography.fontSizes.md, color: colors.light.textSecondary, marginBottom: 12 }
+  container: { flex: 1, backgroundColor: colors.light.background },
+  header: { padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: colors.light.border, borderRadius: 24, backgroundColor: colors.light.card },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 8, color: colors.light.text },
+  scrollContent: { padding: 16, gap: 16 },
+  grammarCard: { backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.light.border, elevation: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  structureContainer: { flex: 1 },
+  structureText: { fontSize: 18, fontWeight: 'bold', color: colors.light.text },
+  levelBadge: { backgroundColor: colors.light.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', marginTop: 4 },
+  levelText: { fontSize: 10, color: colors.light.primary, fontWeight: 'bold' },
+  actionButtons: { flexDirection: 'row', gap: 8 },
+  actionButton: { padding: 8, borderRadius: 8 },
+  editButton: { backgroundColor: palette.warning + '15' },
+  deleteButton: { backgroundColor: palette.error + '15' },
+  infoSection: { marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.light.text },
+  infoGrid: { gap: 6 },
+  infoRow: { flexDirection: 'row' },
+  infoLabel: { fontSize: 13, fontWeight: '600', color: colors.light.textSecondary, width: 80 },
+  infoValue: { fontSize: 13, color: colors.light.text, flex: 1 },
+  examplesSection: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 12 },
+  exampleCard: { backgroundColor: '#f9f9f9', padding: 10, borderRadius: 8, marginBottom: 8 },
+  exampleKorean: { fontSize: 14, color: colors.light.text, marginBottom: 2 },
+  exampleVietnamese: { fontSize: 12, color: colors.light.textSecondary, fontStyle: 'italic' },
+  emptyState: { alignItems: 'center', marginTop: 40 }
 });
 
 export default GrammarTab;

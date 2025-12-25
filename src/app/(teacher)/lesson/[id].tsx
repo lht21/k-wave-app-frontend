@@ -23,7 +23,7 @@ import { colors, palette } from '../../../theme/colors';
 import { typography } from '../../../theme/typography';
 import { lessonService, Lesson } from '../../../services/lessonService';
 import { vocabularyService, Vocabulary } from '../../../services/vocabularyService';
-import { Grammar } from '../../../types/lesson';
+import { Grammar } from '../../../services/grammarService'; 
 import { Listening } from '../../../services/listeningService';
 
 // Types
@@ -37,7 +37,8 @@ type RouteProps = RouteProp<RootStackParamList, 'LessonDetail'>;
 
 const LessonDetailScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const id = typeof params.id === 'string' ? params.id : (params.id?.[0] ?? '');
   
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -54,7 +55,7 @@ const LessonDetailScreen: React.FC = () => {
 
   // Load bài học từ API
   const loadLesson = async () => {
-    if (!id || id === 'undefined') {
+    if (!id || id === '' || id === 'undefined') {
       console.warn('ID không hợp lệ:', id);
       return;
     }
@@ -108,7 +109,7 @@ const LessonDetailScreen: React.FC = () => {
               await vocabularyService.deleteVocabulary(vocabId);
               Alert.alert('Thành công', 'Đã xóa từ vựng');
               // Reload vocabulary
-              loadVocabulary();
+              loadLesson();
             } catch (error: any) {
               Alert.alert('Lỗi', error.message || 'Không thể xóa từ vựng');
             }
@@ -121,17 +122,13 @@ const LessonDetailScreen: React.FC = () => {
   const handleSaveVocabulary = async (formData: Omit<Vocabulary, '_id' | 'lesson' | 'level'>): Promise<void> => {
     try {
       if (isAdding && lesson) {
-        // Tạo từ vựng mới cho lesson
-        const savedVocabulary = await vocabularyService.createVocabularyForLesson(lessonId, formData);
+        const savedVocabulary = await vocabularyService.createVocabularyForLesson(id, formData);
         Alert.alert('Thành công', 'Đã thêm từ vựng mới');
-        // Reload vocabulary
-        loadVocabulary();
+        loadLesson(); // Tải lại dữ liệu bài học
       } else if (editingVocabulary && editingVocabulary._id) {
-        // Cập nhật từ vựng
         const updatedVocabulary = await vocabularyService.updateVocabulary(editingVocabulary._id, formData);
         Alert.alert('Thành công', 'Đã cập nhật từ vựng');
-        // Reload vocabulary
-        loadVocabulary();
+        loadLesson();
       }
       setIsModalOpen(false);
       setEditingVocabulary(null);
@@ -183,8 +180,9 @@ const LessonDetailScreen: React.FC = () => {
       case 'grammar':
         return (
           <GrammarTab 
-            grammar={grammar} // Truyền mảng trực tiếp từ object lesson
-            loading={loading}
+            lessonId={id}           // Truyền ID bài học
+            lessonLevel={lesson?.level} // Truyền level để modal mặc định đúng
+            // loading={loading}
             // onAddGrammar={handleOpenAddModal}
             // onEditGrammar={(item) => handleOpenEditModal(item)}
             // onDeleteGrammar={handleDeleteGrammarApi}
@@ -194,7 +192,7 @@ const LessonDetailScreen: React.FC = () => {
       case 'listening':
         return (
           <ListeningTab 
-            listenings={listenings}
+            lessonId={id}
             // loading={listeningsLoading}
             // onAddListening={() => { /* Mở modal listening */ }}
             // onEditListening={(item) => { /* Logic edit */ }}
@@ -294,12 +292,6 @@ const LessonDetailScreen: React.FC = () => {
           </Text>
           <Text style={styles.statLabel}>Trạng thái</Text>
         </View>
-      </View>
-
-      {/* Description */}
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionLabel}>Mô tả</Text>
-        <Text style={styles.descriptionText}>{lesson.description}</Text>
       </View>
 
       {/* Tabs Navigation */}
@@ -453,24 +445,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.xs,
     color: colors.light.textSecondary,
     fontFamily: typography.fonts.regular,
-  },
-  descriptionContainer: {
-    backgroundColor: colors.light.card,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light.border,
-  },
-  descriptionLabel: {
-    fontSize: typography.fontSizes.sm,
-    fontFamily: typography.fonts.semiBold,
-    color: colors.light.textSecondary,
-    marginBottom: 8,
-  },
-  descriptionText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.light.text,
-    fontFamily: typography.fonts.regular,
-    lineHeight: 20,
   },
   tabsContainer: {
     backgroundColor: colors.light.card,

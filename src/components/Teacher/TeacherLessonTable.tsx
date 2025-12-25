@@ -72,7 +72,6 @@ const TeacherLessonTable: React.FC<TeacherLessonTableProps> = ({ selectedLevel =
 
             const response = await lessonService.getMyLessons(params);
             setLessons(response.lessons);
-            setLessons(response.lessons);
         } catch (error: any) {
             console.error('Error loading lessons:', error);
             Alert.alert('Lỗi', error.message || 'Không thể tải danh sách bài học');
