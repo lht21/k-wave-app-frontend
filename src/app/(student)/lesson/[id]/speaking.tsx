@@ -6,15 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  
+  ActivityIndicator,
+  Alert,
   Platform,
-  StatusBar,
-  Image,
 } from 'react-native';
-import { XIcon, MicrophoneIcon, MicrophoneStageIcon, PlayIcon, PauseIcon, ArrowClockwiseIcon, CheckIcon } from 'phosphor-react-native';
-import { useRouter } from 'expo-router';
+import { 
+  XIcon, 
+  MicrophoneIcon, 
+  PlayIcon, 
+  PauseIcon, 
+} from 'phosphor-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-const { width } = Dimensions.get('window');
+import { Audio } from 'expo-av'; // Import thư viện âm thanh
+import { speakingService, Speaking } from '../../../../services/speakingService';
 
 const COLORS = {
   primaryGreen: '#00C853',
@@ -26,14 +31,15 @@ const COLORS = {
   lightGray: '#E9ECEF',
 };
 
-// --- Component 1: Thẻ ghi âm (Thay đổi theo trạng thái) ---
-const RecordingCard = ({ status, duration }: { status: string, duration: number }) => {
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')} phút`;
-  };
+// --- Helper: Format thời gian ---
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
 
+// --- Component 1: Thẻ ghi âm (Visualizer) ---
+const RecordingCard = ({ status, duration }: { status: string, duration: number }) => {
   return (
     <View style={styles.recordCard}>
       {status === 'idle' && (
@@ -44,14 +50,14 @@ const RecordingCard = ({ status, duration }: { status: string, duration: number 
         <View style={styles.activeRecordView}>
           {status === 'finished' && (
             <View style={styles.badgeRow}>
-               <Text style={styles.recordInfoText}>Bản thu của bạn: {formatTime(duration)}</Text>
+               <Text style={styles.recordInfoText}>Bản thu: {formatTime(duration)}</Text>
                <View style={styles.reqBadge}>
-                  <Text style={styles.reqBadgeText}>Đã đạt Yêu cầu</Text>
+                  <Text style={styles.reqBadgeText}>Đã hoàn thành</Text>
                </View>
             </View>
           )}
           
-          {/* Giả lập Waveform */}
+          {/* Giả lập Waveform (Animation đơn giản) */}
           <View style={styles.waveformContainer}>
              {[1, 2, 3, 4, 5, 6].map((i) => (
                <View 
@@ -74,32 +80,180 @@ const RecordingCard = ({ status, duration }: { status: string, duration: number 
   );
 };
 
-// --- Component 2: Một bài tập nói ---
-const SpeakingExerciseItem = ({ lesson }: any) => {
+// --- Component 2: Một bài tập nói (Logic ghi âm & Nộp bài nằm ở đây) ---
+const SpeakingExerciseItem = ({ speaking }: { speaking: Speaking }) => {
+  // State quản lý ghi âm
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  
+  // State trạng thái UI
   const [status, setStatus] = useState<'idle' | 'recording' | 'paused' | 'finished'>('idle');
   const [duration, setDuration] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  // Logic đếm giờ đơn giản
+  // Timer reference
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up sound khi unmount
   useEffect(() => {
-    let interval: any;
-    if (status === 'recording') {
-      interval = setInterval(() => setDuration(prev => prev + 1), 1000);
+    return () => {
+      if (sound) sound.unloadAsync();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [sound]);
+
+  // 1. Bắt đầu ghi âm
+  const startRecording = async () => {
+    try {
+      // Xin quyền
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert("Lỗi", "Cần cấp quyền microphone để ghi âm.");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      setRecording(recording);
+      setStatus('recording');
+      
+      // Bắt đầu đếm giờ
+      timerRef.current = setInterval(() => {
+        setDuration(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      Alert.alert("Lỗi", "Không thể bắt đầu ghi âm.");
     }
-    return () => clearInterval(interval);
-  }, [status]);
+  };
+
+  // 2. Dừng ghi âm
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    setStatus('finished');
+
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setAudioUri(uri);
+    setRecording(null);
+    
+    // Reset Audio Mode để play loa ngoài to hơn
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+    });
+  };
+
+  // 3. Tạm dừng (Logic tạm dừng của expo-av hơi phức tạp, ở đây ta giả lập bằng stop/resume logic hoặc chỉ stop)
+  // Để đơn giản cho MVP, nút "Tạm dừng" sẽ hoạt động như "Dừng tạm thời" (chưa implement pause thật sự của expo-av)
+  const pauseRecording = async () => {
+      // Expo AV pause recording phức tạp, ở đây ta clear interval để UI dừng
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (recording) {
+          await recording.pauseAsync();
+      }
+      setStatus('paused');
+  };
+
+  const resumeRecording = async () => {
+      if (recording) {
+          await recording.startAsync(); // Resume
+          setStatus('recording');
+          timerRef.current = setInterval(() => {
+              setDuration(prev => prev + 1);
+          }, 1000);
+      }
+  };
+
+  // 4. Nghe lại
+  const playRecording = async () => {
+    if (!audioUri) return;
+    try {
+        if (sound) {
+            await sound.unloadAsync();
+        }
+        const { sound: newSound } = await Audio.Sound.createAsync({ uri: audioUri });
+        setSound(newSound);
+        setIsPlaying(true);
+        await newSound.playAsync();
+        
+        // Khi chạy hết
+        newSound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+                setIsPlaying(false);
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        Alert.alert("Lỗi", "Không thể phát lại file ghi âm.");
+    }
+  };
+
+  // 5. Thu lại (Reset)
+  const resetRecording = () => {
+      setStatus('idle');
+      setDuration(0);
+      setAudioUri(null);
+      setRecording(null);
+      setIsPlaying(false);
+  };
+
+  // 6. Nộp bài
+  const handleSubmit = async () => {
+    if (!audioUri) return;
+
+    try {
+        setSubmitting(true);
+
+        // B1: Upload Audio
+        const uploadResult = await speakingService.uploadAudio({
+            uri: audioUri,
+            name: `speaking_${speaking._id}_${Date.now()}.m4a`,
+            type: 'audio/m4a'
+        });
+
+        // B2: Submit Data
+        await speakingService.submitSpeaking(speaking._id, {
+            audioUrl: uploadResult.audioUrl,
+            recordingDuration: duration,
+            wordCount: 0, // Backend có thể tự tính hoặc để 0
+            fileSize: uploadResult.size
+        });
+
+        Alert.alert("Thành công", "Đã nộp bài nói thành công!");
+        
+        // Có thể disable nút nộp hoặc chuyển trạng thái UI
+    } catch (error: any) {
+        console.error(error);
+        Alert.alert("Lỗi", error.message || "Nộp bài thất bại.");
+    } finally {
+        setSubmitting(false);
+    }
+  };
 
   return (
     <View style={styles.exerciseWrapper}>
-      <Text style={styles.lessonTitle}>Bài {lesson.id}: {lesson.title}</Text>
+      <Text style={styles.lessonTitle}>Bài tập: {speaking.title}</Text>
 
       <RecordingCard status={status} duration={duration} />
 
-      {/* Nhóm nút điều khiển thay đổi theo trạng thái */}
+      {/* --- CÁC NÚT ĐIỀU KHIỂN --- */}
       <View style={styles.controlsRow}>
         {status === 'idle' && (
           <TouchableOpacity 
             style={styles.mainActionBtn} 
-            onPress={() => setStatus('recording')}
+            onPress={startRecording}
           >
             <Text style={styles.mainActionBtnText}>Bắt đầu ghi âm</Text>
           </TouchableOpacity>
@@ -107,56 +261,79 @@ const SpeakingExerciseItem = ({ lesson }: any) => {
 
         {status === 'recording' && (
           <>
-            <TouchableOpacity style={styles.orangeBtn} onPress={() => setStatus('paused')}>
+            <TouchableOpacity style={styles.orangeBtn} onPress={pauseRecording}>
               <Text style={styles.btnText}>Tạm dừng</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.greenBtn} onPress={() => setStatus('finished')}>
-              <Text style={styles.btnText}>Kết thúc</Text>
+            <TouchableOpacity style={styles.greenBtn} onPress={stopRecording}>
+              <Text style={styles.btnText}>Hoàn thành</Text>
             </TouchableOpacity>
           </>
         )}
 
         {status === 'paused' && (
           <>
-            <TouchableOpacity style={styles.orangeBtn} onPress={() => setStatus('recording')}>
+            <TouchableOpacity style={styles.orangeBtn} onPress={resumeRecording}>
               <Text style={styles.btnText}>Tiếp tục</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.greenBtn} onPress={() => setStatus('finished')}>
-              <Text style={styles.btnText}>Kết thúc</Text>
+            <TouchableOpacity style={styles.greenBtn} onPress={stopRecording}>
+              <Text style={styles.btnText}>Hoàn thành</Text>
             </TouchableOpacity>
           </>
         )}
 
         {status === 'finished' && (
           <>
-            <TouchableOpacity style={styles.orangeBtn} onPress={() => { setStatus('idle'); setDuration(0); }}>
+            <TouchableOpacity style={styles.orangeBtn} onPress={resetRecording} disabled={submitting}>
               <Text style={styles.btnText}>Thu lại</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.greenBtn}>
-              <Text style={styles.btnText}>Nghe lại</Text>
+            <TouchableOpacity style={styles.greenBtn} onPress={playRecording} disabled={submitting}>
+               <View style={{flexDirection: 'row', alignItems: 'center', gap: 5}}>
+                  {isPlaying ? <PauseIcon color="#FFF" size={20}/> : <PlayIcon color="#FFF" size={20}/>}
+                  <Text style={styles.btnText}>{isPlaying ? "Đang phát" : "Nghe lại"}</Text>
+               </View>
             </TouchableOpacity>
           </>
         )}
       </View>
 
-      {/* Thông tin bài tập */}
+      {/* --- THÔNG TIN BÀI TẬP --- */}
       <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Gợi ý làm bài</Text>
-        {lesson.suggestions.map((s: string, i: number) => (
-          <Text key={i} style={styles.bulletItem}>• {s}</Text>
-        ))}
+        {/* Gợi ý */}
+        {speaking.hints && speaking.hints.length > 0 && (
+            <>
+                <Text style={styles.infoLabel}>Gợi ý làm bài</Text>
+                {speaking.hints.map((s, i) => (
+                <Text key={i} style={styles.bulletItem}>• {s}</Text>
+                ))}
+            </>
+        )}
 
-        <Text style={[styles.infoLabel, { marginTop: 15 }]}>Ví dụ</Text>
-        <Text style={styles.exampleKr}>• {lesson.example.kr}</Text>
-        <Text style={styles.exampleVi}>• {lesson.example.vi}</Text>
+        {/* Mẫu câu */}
+        {speaking.sampleAnswer && (
+            <>
+                <Text style={[styles.infoLabel, { marginTop: 15 }]}>Ví dụ</Text>
+                <Text style={styles.exampleText}>• {speaking.sampleAnswer}</Text>
+            </>
+        )}
 
+        {/* Yêu cầu */}
         <Text style={[styles.infoLabel, { marginTop: 15 }]}>Yêu cầu</Text>
-        <Text style={styles.bulletItem}>• Thời lượng bản ghi: {lesson.requirement}</Text>
+        <Text style={styles.bulletItem}>• Chủ đề: {speaking.prompt}</Text>
+        {speaking.duration && <Text style={styles.bulletItem}>• Thời lượng gợi ý: {speaking.duration} giây</Text>}
       </View>
       
+      {/* NÚT NỘP BÀI */}
       {status === 'finished' && (
-        <TouchableOpacity style={styles.submitBtnLarge}>
-          <Text style={styles.submitBtnText}>Nộp bài</Text>
+        <TouchableOpacity 
+            style={[styles.submitBtnLarge, submitting && { opacity: 0.7 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
+        >
+          {submitting ? (
+              <ActivityIndicator color={COLORS.white} />
+          ) : (
+              <Text style={styles.submitBtnText}>Nộp bài</Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -166,23 +343,36 @@ const SpeakingExerciseItem = ({ lesson }: any) => {
 // --- Màn hình chính ---
 export default function SpeakingExerciseScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams(); // lessonId
 
-  const mockLessons = [
-    {
-      id: 1,
-      title: 'Gia đình của tôi',
-      suggestions: [
-        'Giới thiệu tên, tuổi, quê quán, sở thích và ước mơ',
-        'Từ khoá có thể sử dụng:',
-        'Mẫu:'
-      ],
-      example: {
-        kr: '안녕하세요. 저는 민호입니다. 25살입니다...',
-        vi: 'Xin chào. Tôi là Minho. Tôi 25 tuổi...'
-      },
-      requirement: '60 phút'
-    }
-  ];
+  const [speakings, setSpeakings] = useState<Speaking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSpeakings = async () => {
+      try {
+        const lessonId = Array.isArray(id) ? id[0] : id;
+        if (lessonId) {
+            const data = await speakingService.getSpeakingByLesson(lessonId);
+            setSpeakings(data || []);
+        }
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Lỗi", "Không thể tải bài tập nói.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSpeakings();
+  }, [id]);
+
+  if (loading) {
+    return (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+        </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -192,16 +382,22 @@ export default function SpeakingExerciseScreen() {
             <TouchableOpacity onPress={() => router.back()}>
               <XIcon size={28} color={COLORS.white} weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Bài nói</Text>
+            <Text style={styles.headerTitle}>Luyện Nói</Text>
             <View style={{ width: 28 }} />
           </View>
         </SafeAreaView>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {mockLessons.map(lesson => (
-          <SpeakingExerciseItem key={lesson.id} lesson={lesson} />
-        ))}
+        {speakings.length === 0 ? (
+             <Text style={{textAlign: 'center', marginTop: 30, color: COLORS.textGray}}>
+                 Không có bài tập nói nào.
+             </Text>
+        ) : (
+            speakings.map(item => (
+                <SpeakingExerciseItem key={item._id} speaking={item} />
+            ))
+        )}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -214,7 +410,7 @@ const styles = StyleSheet.create({
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 10 },
   headerTitle: { color: COLORS.white, fontSize: 20, fontWeight: 'bold' },
 
-  exerciseWrapper: { padding: 20 },
+  exerciseWrapper: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingBottom: 40 },
   lessonTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 20 },
 
   // Record Card
@@ -256,8 +452,7 @@ const styles = StyleSheet.create({
   infoSection: { marginTop: 10 },
   infoLabel: { fontSize: 16, fontWeight: 'bold', color: COLORS.primaryGreen, marginBottom: 12 },
   bulletItem: { fontSize: 14, color: COLORS.textDark, marginBottom: 6, fontWeight: '600' },
-  exampleKr: { fontSize: 14, color: COLORS.textDark, fontWeight: '600', marginBottom: 4 },
-  exampleVi: { fontSize: 14, color: COLORS.textDark, fontStyle: 'italic' },
+  exampleText: { fontSize: 14, color: COLORS.textDark, fontStyle: 'italic', marginBottom: 6 },
 
   // Submit
   submitBtnLarge: { backgroundColor: COLORS.primaryGreen, borderRadius: 30, paddingVertical: 16, alignItems: 'center', marginTop: 30 },

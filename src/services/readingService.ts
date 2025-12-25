@@ -2,6 +2,25 @@
 import API_BASE_URL from '../api/api';
 import { authService } from './authService';
 
+export interface ReadingResultDetail {
+    questionId: string;
+    userAnswer: number;
+    correctAnswer: number;
+    isCorrect: boolean;
+    explanation: string;
+}
+
+export interface ReadingSubmissionResponse {
+    success: boolean;
+    data: {
+        score: number;
+        correctCount: number;
+        totalQuestions: number;
+        results: ReadingResultDetail[];
+        passed: boolean;
+    };
+}
+
 // Types chung
 export interface Question {
   _id?: string;
@@ -9,6 +28,18 @@ export interface Question {
   options: string[];
   answer: number;
   explanation: string;
+}
+
+export interface ReadingExercise {
+  _id: string;
+  title: string;
+  content: string;
+  questions: {
+    _id: string;
+    question: string;
+    options: string[]; // Backend lưu mảng string ["A", "B"]
+    // answer: number (Ẩn hoặc hiện tùy logic)
+  }[];
 }
 
 export interface Reading {
@@ -66,32 +97,8 @@ class ReadingService {
     return response.json();
   }
 
-  // GET: Lấy bài đọc theo lesson
-  async getReadingsByLesson(
-    lessonId: string, 
-    params?: {
-      search?: string;
-      page?: number;
-      limit?: number;
-      difficulty?: string;
-    }
-  ): Promise<ReadingResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params?.search) queryParams.append('search', params.search);
-      if (params?.page) queryParams.append('page', params.page.toString());
-      if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.difficulty) queryParams.append('difficulty', params.difficulty);
-      
-      const url = `${API_BASE_URL}/readings/lesson/${lessonId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      console.log('📚 Fetching readings for lesson:', lessonId);
-      return await this.fetchWithAuth<ReadingResponse>(url);
-    } catch (error) {
-      console.error('Error fetching readings:', error);
-      throw error;
-    }
-  }
+
+  
 
   // POST: Tạo bài đọc cho lesson
   async createReadingForLesson(lessonId: string, readingData: Omit<Reading, '_id' | 'lesson' | 'author'>): Promise<Reading> {
@@ -145,16 +152,38 @@ class ReadingService {
   }
 
   // POST: Nộp bài làm
-  async submitReading(id: string, answers: { questionId: string; selectedAnswer: number }[]) {
-    return this.fetchWithAuth<{
-      score: number;
-      correctCount: number;
-      totalQuestions: number;
-      results: any[];
-    }>(`${API_BASE_URL}/readings/${id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({ answers }),
-    });
+  async submitReading(
+      readingId: string, 
+      lessonId: string, 
+      answers: Record<string, number>
+  ): Promise<ReadingSubmissionResponse> {
+      try {
+          if (!readingId || !lessonId) throw new Error("Missing ID");
+
+          const token = await authService.getToken();
+          const response = await fetch(`${API_BASE_URL}/readings/${readingId}/submit`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ lessonId, answers }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || 'Submission failed');
+          
+          return data;
+      } catch (error) {
+          console.error('Submit reading error:', error);
+          throw error;
+      }
+  }
+
+  async getReadingsByLesson(lessonId: string): Promise<ReadingExercise[]> {
+    const url = `${API_BASE_URL}/readings/lesson/${lessonId}`;
+    const response = await this.fetchWithAuth<{success: boolean, data: ReadingExercise[]}>(url);
+    return response.data;
   }
 
   // GET: Thống kê

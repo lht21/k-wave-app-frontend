@@ -102,7 +102,18 @@ const LessonDetail = () => {
       <Text style={styles.grammarMainText}>{item.structure || '예절'}</Text>
       <View style={styles.vocabDivider} />
       <Text style={styles.vietText}>{item.meaning || 'nghi lễ'}</Text>
-      <TouchableOpacity style={styles.expandIcon} onPress={() => router.push(`/(student)/lesson/${id}/grammar`)}>
+      <TouchableOpacity 
+        style={styles.expandIcon} 
+        onPress={() => {
+          // 👉 GIẢI PHÁP: Truyền object item qua params
+          router.push({
+            pathname: `/(student)/lesson/${id}/grammar`,
+            params: { 
+              grammarData: JSON.stringify(item) 
+            }
+          });
+        }}
+      >
         <CornersOutIcon size={20} color={COLORS.textDark} />
       </TouchableOpacity>
     </View>
@@ -222,7 +233,7 @@ const LessonDetail = () => {
             </TouchableOpacity>
           )}
 
-          {/* {lesson?.speaking.length > 0 && ( */}
+          {lesson?.speaking.length > 0 && (
             <TouchableOpacity style={styles.exerciseCard} onPress={() => router.push(`/(student)/lesson/${id}/speaking`)}>
               <View style={styles.exerciseIconContainer}>
                 <ChalkboardTeacherIcon size={24} color={COLORS.primaryGreen} weight="fill" />
@@ -233,7 +244,7 @@ const LessonDetail = () => {
               </View>
               <View style={styles.exerciseDecorativeShape} />
             </TouchableOpacity>
-          {/* )} */}
+          )}
 
           {lesson?.listening.length > 0 && (
             <TouchableOpacity style={styles.exerciseCard} onPress={() => router.push(`/(student)/lesson/${id}/listening`)}>

@@ -25,6 +25,11 @@ export const palette = {
     statBlue: '#C5D8FF',
     statOrange: '#FFCC91',
     statGreen: '#C7FFD8',
+
+    textDark: '#1A1A1A',
+    textGray: '#666666',
+  
+    optionBg: '#E0E0E0',
 };
 
 export const colors = {

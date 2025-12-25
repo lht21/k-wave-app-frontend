@@ -19,6 +19,7 @@ import { vocabularyService, Vocabulary } from '../../../../services/vocabularySe
 import { palette } from '../../../../theme/colors';
 import { ActivityIndicator } from 'react-native-paper';
 import { lessonProgressService, PopulatedVocabularyStatus } from '../../../../services/lessonProgressService';
+import ProcessBar from '../../../../components/ProcessBar/ProcessBar';
 
 const { width } = Dimensions.get('window');
 
@@ -44,17 +45,23 @@ const StatCard = ({ title, count, color, textColor }: any) => (
 );
 
 // --- Component 2: Thẻ từ vựng (Vocab Card) ---
-const VocabItem = ({ item }: any) => (
+const VocabItem = ({ item, onToggleStatus, onSpeak }: any) => (
   <View style={styles.vocabCard}>
     <View style={styles.vocabInfo}>
-      <Text style={styles.krText}>{item.word}</Text>
-      <Text style={styles.viText}>{item.meaning}</Text>
+      <Text style={styles.krText}>{item.vocabularyId.word}</Text>
+      <Text style={styles.viText}>{item.vocabularyId.meaning}</Text>
     </View>
     <View style={styles.vocabActions}>
-      <TouchableOpacity style={styles.iconBtn}>
+      <TouchableOpacity style={styles.iconBtn} onPress={() => onSpeak(item.vocabularyId.word)}>
         <SpeakerHighIcon size={24} color={COLORS.textDark} weight="regular" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn}>
+      <TouchableOpacity style={styles.iconBtn}
+        onPress={() => {
+          // Logic toggle: Nếu đang là mastered -> chuyển về learning, ngược lại -> mastered
+          const newStatus = item.status === 'mastered' ? 'learning' : 'mastered';
+          onToggleStatus(item.vocabularyId._id, newStatus);
+        }}
+      >
         <StarIcon size={24} color={COLORS.textDark} weight="regular" />
       </TouchableOpacity>
     </View>
@@ -67,6 +74,7 @@ export default function ListVocabularyScreen() {
   const [vocabStatusList, setVocabStatusList] = useState<PopulatedVocabularyStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('Tất cả');
+  const [vocabularyProgress, setVocabularyProgress] = useState(0);
 
 
   // 1. Fetch dữ liệu thực tế từ API
@@ -81,6 +89,7 @@ export default function ListVocabularyScreen() {
         
         if (response.success && response.data.vocabularyStatus) {
            setVocabStatusList(response.data.vocabularyStatus);
+            setVocabularyProgress(response.data.vocabularyProgress || 0);
         }
       } catch (error) {
         console.error("Lỗi khi tải danh sách từ vựng:", error);
@@ -133,17 +142,6 @@ export default function ListVocabularyScreen() {
     Speech.speak(text, { language: 'ko-KR' });
   };
   
-
-  // Dữ liệu giả lập
-  const mockVocabs = [
-    { id: '1', kr: '예절', vi: 'nghi lễ' },
-    { id: '2', kr: '예절', vi: 'nghi lễ' },
-    { id: '3', kr: '예절', vi: 'nghi lễ' },
-    { id: '4', kr: '예절', vi: 'nghi lễ' },
-    { id: '5', kr: '예절', vi: 'nghi lễ' },
-    { id: '6', kr: '예절', vi: 'nghi lễ' },
-  ];
-
   const filters = [
     { label: `Tất cả (${vocabStatusList.length})`, value: 'Tất cả' },
     { label: 'Chưa học', value: 'Chưa học' },
@@ -167,6 +165,8 @@ export default function ListVocabularyScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+          <ProcessBar percent={vocabularyProgress} />
           
           {/* Section: Thống kê (Stat Cards) */}
           <View style={styles.statsRow}>

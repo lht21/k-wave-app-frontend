@@ -148,6 +148,7 @@ export interface SubmissionData {
   content: string;
   timeSpent?: number;
   isDraft?: boolean;
+  lessonId?: string;
 }
 
 class WritingService {
@@ -287,28 +288,14 @@ async createWritingForLesson(
 }
 
   // GET: Lấy writing theo lesson
-  async getWritingsByLesson(
-    lessonId: string, 
-    params?: {
-      search?: string;
-      page?: number;
-      limit?: number;
-    }
-  ): Promise<WritingResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params?.search) queryParams.append('search', params.search);
-      if (params?.page) queryParams.append('page', params.page?.toString() || '1');
-      if (params?.limit) queryParams.append('limit', params.limit?.toString() || '20');
-      
-      const url = `${API_BASE_URL}/writings/lesson/${lessonId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      console.log('📝 Fetching writing exercises for lesson:', lessonId);
-      return await this.fetchWithAuth<WritingResponse>(url);
-    } catch (error) {
-      console.error('Error fetching writing exercises:', error);
-      throw error;
-    }
+  async getWritingsByLesson(lessonId: string): Promise<Writing[]> {
+    const url = `${API_BASE_URL}/writings/lesson/${lessonId}`;
+    
+    // Gọi API và map kiểu dữ liệu trả về { success: boolean, data: Writing[] }
+    const response = await this.fetchWithAuth<{ success: boolean; data: Writing[] }>(url);
+    
+    // Trả về mảng data trực tiếp
+    return response.data;
   }
 
   // GET: Lấy tất cả writings (có filter)

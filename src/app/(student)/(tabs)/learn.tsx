@@ -16,6 +16,7 @@ import { Lesson, lessonService } from '../../../services/lessonService';
 import Modal from "react-native-modal";
 import { useRouter } from 'expo-router';
 
+
 const { width } = Dimensions.get('window');
 
 const COLORS = {
@@ -38,13 +39,7 @@ const levels = [
 
 ]
 
-// // Dữ liệu giả lập bài học tương ứng
-// const MOCK_LESSONS = [
-//   { id: '1', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'learning' },
-//   { id: '2', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-//   { id: '3', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-//   { id: '4', index: '0', title: 'Bảng chữ cái', sub: '알파벳', status: 'pending' },
-// ];
+
 
 export default function StdLearn() {
   const [currentLevel, setCurrentLevel] = useState('Sơ cấp 1');
@@ -65,7 +60,7 @@ export default function StdLearn() {
   const loadLessons = async () => {
       try {
           setIsLoading(true);
-          const response = await lessonService.getLessons({ level: currentLevel });
+          const response = await lessonService.getLessonsForStudent({ level: currentLevel });
           setLessons(response.lessons);
       } catch (error: any) {
           console.error('Error loading lessons:', error);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
-  
-  Platform,
-  StatusBar,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { XIcon, PenNibIcon } from 'phosphor-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { writingService, Writing } from '../../../../services/writingService';
 
 const { width } = Dimensions.get('window');
 
@@ -29,19 +29,31 @@ const COLORS = {
 };
 
 // --- Component 1: Một bài tập viết ---
-const WritingExerciseItem = ({ lesson }: any) => {
+interface WritingItemProps {
+  writing: Writing;
+  content: string;
+  onContentChange: (text: string) => void;
+}
+
+const WritingExerciseItem = ({ writing, content, onContentChange }: WritingItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [content, setContent] = useState('');
+
+  // Tạo danh sách gợi ý từ các trường hint
+  const suggestions = [
+    ...(writing.wordHint || []),
+    ...(writing.grammarHint || []),
+    writing.structureHint
+  ].filter(Boolean); // Lọc bỏ giá trị null/undefined
 
   return (
     <View style={styles.exerciseWrapper}>
-      <Text style={styles.lessonTitle}>Bài {lesson.id}: {lesson.title}</Text>
-      <Text style={styles.instructionText}>{lesson.instruction}</Text>
+      <Text style={styles.lessonTitle}>Bài viết: {writing.title}</Text>
+      <Text style={styles.instructionText}>{writing.instruction || writing.prompt}</Text>
 
       {/* Khung nhập liệu Card */}
       <View style={styles.inputCard}>
         {!isEditing && content === '' ? (
-          // Trạng thái: Chưa bắt đầu (Ảnh 18)
+          // Trạng thái: Chưa bắt đầu
           <View style={styles.startContainer}>
             <View style={styles.iconCircle}>
               <PenNibIcon size={40} color={COLORS.primaryGreen} weight="duotone" />
@@ -54,7 +66,7 @@ const WritingExerciseItem = ({ lesson }: any) => {
             </TouchableOpacity>
           </View>
         ) : (
-          // Trạng thái: Đang soạn thảo hoặc Đã viết xong (Ảnh 20, 21)
+          // Trạng thái: Đang soạn thảo
           <View style={styles.editingContainer}>
             <TextInput
               style={styles.textInput}
@@ -62,11 +74,11 @@ const WritingExerciseItem = ({ lesson }: any) => {
               placeholder="Soạn bài viết của bạn tại đây..."
               placeholderTextColor={COLORS.textGray}
               value={content}
-              onChangeText={setContent}
+              onChangeText={onContentChange}
               autoFocus={isEditing}
             />
             <View style={styles.cardFooter}>
-              {content.length > 50 && (
+              {content.length >= writing.minWords && (
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusBadgeText}>Đã đạt yêu cầu</Text>
                 </View>
@@ -81,21 +93,28 @@ const WritingExerciseItem = ({ lesson }: any) => {
 
       {/* Thông tin bổ trợ */}
       <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Gợi ý làm bài</Text>
-        {lesson.suggestions.map((s: string, i: number) => (
-          <Text key={i} style={styles.bulletItem}>• {s}</Text>
-        ))}
+        {suggestions.length > 0 && (
+          <>
+            <Text style={styles.infoLabel}>Gợi ý làm bài</Text>
+            {suggestions.map((s: any, i: number) => (
+              <Text key={i} style={styles.bulletItem}>• {s}</Text>
+            ))}
+          </>
+        )}
 
-        <Text style={[styles.infoLabel, { marginTop: 15 }]}>Ví dụ</Text>
-        {lesson.examples.map((ex: any, i: number) => (
-          <View key={i} style={styles.exampleItem}>
-            <Text style={styles.exampleKr}>• {ex.kr}</Text>
-            <Text style={styles.exampleVi}>• {ex.vi}</Text>
-          </View>
-        ))}
+        {(writing.sampleAnswer || writing.sampleTranslation) && (
+          <>
+            <Text style={[styles.infoLabel, { marginTop: 15 }]}>Ví dụ</Text>
+            <View style={styles.exampleItem}>
+              {writing.sampleAnswer && <Text style={styles.exampleKr}>• {writing.sampleAnswer}</Text>}
+              {writing.sampleTranslation && <Text style={styles.exampleVi}>• {writing.sampleTranslation}</Text>}
+            </View>
+          </>
+        )}
 
         <Text style={[styles.infoLabel, { marginTop: 15 }]}>Yêu cầu</Text>
-        <Text style={styles.bulletItem}>• Thời lượng bản ghi: {lesson.requirement}</Text>
+        <Text style={styles.bulletItem}>• Tối thiểu: {writing.minWords} từ</Text>
+        <Text style={styles.bulletItem}>• Thời gian gợi ý: {writing.estimatedTime} phút</Text>
       </View>
     </View>
   );
@@ -104,61 +123,155 @@ const WritingExerciseItem = ({ lesson }: any) => {
 // --- Màn hình chính ---
 export default function WritingExerciseScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams(); // id là lessonId
+  
+  const [writings, setWritings] = useState<Writing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // State lưu nội dung bài làm: { writingId: content }
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  
+  // Dùng để tính thời gian làm bài (đơn giản)
+  const startTimeRef = useRef<number>(Date.now());
 
-  // Mock data giả lập nhiều bài viết
-  const mockLessons = [
-    {
-      id: 1,
-      title: 'Gia đình của tôi',
-      instruction: 'Hãy viết một đoạn văn ngắn (3-5 câu) giới thiệu về bản thân (Tên, tuổi...',
-      suggestions: [
-        'Giới thiệu tên, tuổi, quê quán, sở thích và ước mơ',
-        'Từ khoá có thể sử dụng:',
-        'Mẫu:'
-      ],
-      examples: [
-        { 
-          kr: '안녕하세요. 저는 민호입니다. 25살입니다. 베트남에서 왔습니다. 제 취미는 음악 감상입니다. 제 꿈은 한국에 가는 것입니다.',
-          vi: 'Xin chào. Tôi là Minho. Tôi 25 tuổi. Tôi đến từ Việt Nam. Sở thích của...'
+  // 1. Fetch dữ liệu
+  useEffect(() => {
+    const fetchWritings = async () => {
+      try {
+        const lessonId = Array.isArray(id) ? id[0] : id;
+        if (lessonId) {
+          const data = await writingService.getWritingsByLesson(lessonId);
+          setWritings(data || []);
         }
-      ],
-      requirement: '60 phút'
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Lỗi", "Không thể tải bài tập viết.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWritings();
+  }, [id]);
+
+  // 2. Xử lý thay đổi nội dung
+  const handleContentChange = (writingId: string, text: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      [writingId]: text
+    }));
+  };
+
+  // 3. Xử lý nộp bài
+  const handleSubmit = async () => {
+    const lessonId = Array.isArray(id) ? id[0] : id;
+    if (!lessonId) return;
+
+    // Kiểm tra xem có bài nào chưa làm không
+    const answeredCount = Object.keys(answers).filter(key => answers[key].trim().length > 0).length;
+    
+    if (answeredCount === 0) {
+      Alert.alert("Thông báo", "Bạn chưa viết bài nào cả!");
+      return;
     }
-  ];
+
+    try {
+      setSubmitting(true);
+      const timeSpent = Math.round((Date.now() - startTimeRef.current) / 1000); // Tính giây
+
+      // Duyệt qua danh sách bài tập và nộp những bài có nội dung
+      for (const writing of writings) {
+        const content = answers[writing._id];
+        
+        // Chỉ nộp những bài có nội dung
+        if (content && content.trim().length > 0) {
+          await writingService.submitWriting(writing._id, {
+            content: content,
+            timeSpent: timeSpent, // Hoặc logic chia thời gian chi tiết hơn nếu cần
+            isDraft: false,
+            lessonId: lessonId
+          });
+        }
+      }
+
+      Alert.alert(
+        "Thành công", 
+        "Đã nộp bài viết thành công! Giáo viên sẽ chấm bài và phản hồi sớm nhất.",
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Lỗi", error.message || "Nộp bài thất bại.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header xanh (Ảnh 18) */}
+      {/* Header */}
       <View style={styles.header}>
         <SafeAreaView edges={['top']}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()}>
               <XIcon size={28} color={COLORS.white} weight="bold" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Bài viết</Text>
+            <Text style={styles.headerTitle}>Luyện Viết</Text>
             <View style={{ width: 28 }} />
           </View>
         </SafeAreaView>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
-        {mockLessons.map((lesson) => (
-          <WritingExerciseItem key={lesson.id} lesson={lesson} />
-        ))}
+        {writings?.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={{ color: COLORS.textGray, marginTop: 20 }}>Không có bài tập viết nào.</Text>
+          </View>
+        ) : (
+          (writings || []).map((writing) => (
+            <WritingExerciseItem 
+              key={writing._id} 
+              writing={writing} 
+              content={answers[writing._id] || ''}
+              onContentChange={(text) => handleContentChange(writing._id, text)}
+            />
+          ))
+        )}
       </ScrollView>
 
-      {/* Nộp bài Button (Ảnh 21) */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.submitBtn} activeOpacity={0.8}>
-          <Text style={styles.submitBtnText}>Nộp bài</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Footer Nộp bài */}
+      {writings?.length > 0 && (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.submitBtn, submitting && { opacity: 0.7 }]} 
+            activeOpacity={0.8}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.submitBtnText}>Nộp bài</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { backgroundColor: COLORS.primaryGreen, paddingBottom: 20 },
   headerContent: { 
     flexDirection: 'row', 
