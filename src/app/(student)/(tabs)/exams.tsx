@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,19 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Platform,
-  StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 // Import icons từ phosphor-react-native
 import {
   ExamIcon,
   ArrowRightIcon,
   WavesIcon,
-  ArrowClockwiseIcon,
-  ArrowRight,
 } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useExam } from '../../../hooks/useExam';
+import { Exam, ExamType } from '../../../services/examService';
 
 // Lấy chiều rộng màn hình để tính toán layout lưới
 const { width } = Dimensions.get('window');
@@ -35,24 +35,59 @@ const COLORS = {
   white: '#FFFFFF',
 };
 
-// Dữ liệu giả lập (Mock Data) để hiển thị danh sách
-// Sau này bạn sẽ thay thế bằng dữ liệu thật từ API
-const MOCK_FEATURED_EXAMS = [
-  { id: '1', title: 'Topik 2 - Kỳ 36' },
-  { id: '2', title: 'Topik 3 - Kỳ 96' },
-];
-
-const MOCK_LEVEL_EXAMS = [
-  { id: '1', title: 'Topik 1' },
-  { id: '2', title: 'Topik 2' },
-  { id: '3', title: 'Topik 3' },
-  { id: '4', title: 'Topik 4' },
-  { id: '5', title: 'Topik 5' },
-  { id: '6', title: 'Topik 6' },
-  { id: '7', title: 'EPS' },
-];
+// Exam type labels
+const examTypeLabels: { [key in ExamType]: string } = {
+  topik1: 'TOPIK I',
+  topik2: 'TOPIK II',
+  esp: 'ESP',
+};
 
 export default function ExamsScreen() {
+  const router = useRouter();
+  const { loading, fetchExams } = useExam();
+  
+  const [selectedType, setSelectedType] = useState<ExamType>('topik1');
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
+
+  // Load exams when component mounts or type changes
+  useEffect(() => {
+    loadExams();
+  }, [selectedType]);
+
+  const loadExams = async () => {
+    try {
+      setRefreshing(true);
+      const data = await fetchExams(selectedType);
+      setExams(data);
+      
+      // Get featured exams (premium ones or latest 2)
+      const featured = data.filter(exam => exam.isPremium).slice(0, 2);
+      if (featured.length === 0) {
+        setFeaturedExams(data.slice(0, 2));
+      } else {
+        setFeaturedExams(featured);
+      }
+    } catch (error) {
+      console.error('Error loading exams:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleStartExam = (examId: string, examTitle: string) => {
+    // Navigate to exam taking screen
+    router.push({
+      pathname: '/(student)/exam/practice',
+      params: { examId, examTitle }
+    });
+  };
+
+  const handleChangeExamType = (type: ExamType) => {
+    setSelectedType(type);
+  };
+
   // Component cho mảng trang trí góc phải dưới của các thẻ
   const DecorativeCorner = ({ isSmall = false }) => (
     <View
@@ -63,6 +98,15 @@ export default function ExamsScreen() {
     />
   );
 
+  if (loading && exams.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+        <Text style={styles.loadingText}>Đang tải đề thi...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
        {/* Tạo nền cong nhẹ trên header giống thiết kế */}
@@ -72,81 +116,105 @@ export default function ExamsScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={loadExams}
+              colors={[COLORS.primaryGreen]}
+              tintColor={COLORS.primaryGreen}
+            />
+          }
         >
           {/* --- Header Title --- */}
           <Text style={styles.mainHeaderTitle}>Luyện thi</Text>
 
-          {/* --- Section 1: Thi lại (Retry Exam) --- */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Thi lại</Text>
-            {/* Thẻ bài thi chính */}
-            <View style={styles.mainRetryCard}>
-              <View style={styles.retryCardTopRow}>
-                {/* Icon Container */}
-                <View style={styles.iconContainerGreen}>
-                  <ExamIcon size={28} color={COLORS.iconGreen} weight="fill" />
-                </View>
-                <Text style={styles.cardTitleLarge}>Topik 2 - Kỳ 36</Text>
-              </View>
-
-              <View style={styles.retryCardBottomRow}>
-                <Text style={styles.previousScoreText}>Điểm lần trước: 60/100</Text>
-                {/* Nút bấm Gradient */}
-                <TouchableOpacity activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#00D95F', '#00B34A']} // Gradient xanh
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.retryButtonGradient}
-                  >
-                    <ArrowClockwiseIcon size={18} color={COLORS.white} weight="bold" style={{ marginRight: 8 }} />
-                    <Text style={styles.retryButtonText}>Thử sức lại ngay!</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-              {/* Mảng trang trí góc */}
-              <DecorativeCorner />
-            </View>
-          </View>
-
-          {/* --- Section 2: Đề thi nổi bật (Featured Exams) --- */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Đề thi nổi bật</Text>
-              <TouchableOpacity>
-                 <ArrowRightIcon size={24} color={COLORS.textDark} />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Danh sách đề thi nổi bật */}
-            {MOCK_FEATURED_EXAMS.map((exam) => (
-              <TouchableOpacity key={exam.id} style={styles.featuredCard} activeOpacity={0.7}>
-                <View style={styles.iconContainerGreen}>
-                   {/* Sử dụng icon Exam từ phosphor */}
-                  <ExamIcon size={24} color={COLORS.iconGreen} weight="fill" />
-                </View>
-                <Text style={styles.cardTitleMedium}>{exam.title}</Text>
-                <DecorativeCorner isSmall={true} />
+          {/* Exam Type Tabs */}
+          <View style={styles.typeTabsContainer}>
+            {(Object.keys(examTypeLabels) as ExamType[]).map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.typeTab,
+                  selectedType === type && styles.activeTypeTab
+                ]}
+                onPress={() => handleChangeExamType(type)}
+              >
+                <Text style={[
+                  styles.typeTabText,
+                  selectedType === type && styles.activeTypeTabText
+                ]}>
+                  {examTypeLabels[type]}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* --- Section 3: Đề thi theo cấp độ (Exams by Level) --- */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Đề thi theo cấp độ</Text>
-            {/* Grid Layout 2 cột */}
-            <View style={styles.gridContainer}>
-              {MOCK_LEVEL_EXAMS.map((exam) => (
-                <TouchableOpacity key={exam.id} style={styles.levelCard} activeOpacity={0.7}>
-                  <View style={styles.iconContainerGray}>
-                    {/* Sử dụng icon Waves để giống hình sóng trong thiết kế */}
-                    <WavesIcon size={24} color={COLORS.iconGreen} weight="regular" />
+          {/* --- Section 2: Đề thi nổi bật (Featured Exams) --- */}
+          {featuredExams.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Đề thi nổi bật</Text>
+                <TouchableOpacity>
+                  <ArrowRightIcon size={24} color={COLORS.textDark} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Danh sách đề thi nổi bật */}
+              {featuredExams.map((exam) => (
+                <TouchableOpacity 
+                  key={exam._id} 
+                  style={styles.featuredCard} 
+                  activeOpacity={0.7}
+                  onPress={() => handleStartExam(exam._id, exam.title)}
+                >
+                  <View style={styles.iconContainerGreen}>
+                    <ExamIcon size={24} color={COLORS.iconGreen} weight="fill" />
                   </View>
-                  <Text style={styles.cardTitleMedium}>{exam.title}</Text>
-                   <DecorativeCorner isSmall={true} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitleMedium}>{exam.title}</Text>
+                    {exam.isPremium && (
+                      <Text style={styles.premiumBadgeText}>⭐ Premium</Text>
+                    )}
+                  </View>
+                  <DecorativeCorner isSmall={true} />
                 </TouchableOpacity>
               ))}
             </View>
+          )}
+
+          {/* --- Section 3: Tất cả đề thi (All Exams) --- */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tất cả đề thi</Text>
+            {exams.length === 0 ? (
+              <View style={styles.emptyState}>
+                <ExamIcon size={48} color={COLORS.textGray} weight="thin" />
+                <Text style={styles.emptyText}>Chưa có đề thi nào</Text>
+              </View>
+            ) : (
+              <View style={styles.gridContainer}>
+                {exams.map((exam) => (
+                  <TouchableOpacity 
+                    key={exam._id} 
+                    style={styles.levelCard} 
+                    activeOpacity={0.7}
+                    onPress={() => handleStartExam(exam._id, exam.title)}
+                  >
+                    <View style={styles.iconContainerGray}>
+                      <WavesIcon size={24} color={COLORS.iconGreen} weight="regular" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardTitleMedium} numberOfLines={2}>
+                        {exam.title}
+                      </Text>
+                      <Text style={styles.examMeta}>
+                        {exam.totalQuestions || 0} câu • {exam.duration || 0} phút
+                      </Text>
+                    </View>
+                    <DecorativeCorner isSmall={true} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Khoảng trống dưới cùng */}
@@ -161,6 +229,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textGray,
   },
   // Tạo hình nền cong nhẹ ở top
   headerBackgroundShape: {
@@ -185,7 +264,36 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: COLORS.primaryGreen,
+    marginBottom: 20,
+  },
+  // Exam Type Tabs
+  typeTabsContainer: {
+    flexDirection: 'row',
     marginBottom: 25,
+    gap: 12,
+  },
+  typeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: COLORS.cardBg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  activeTypeTab: {
+    backgroundColor: COLORS.primaryGreen + '15',
+    borderColor: COLORS.primaryGreen,
+  },
+  typeTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textGray,
+  },
+  activeTypeTabText: {
+    color: COLORS.primaryGreen,
+    fontWeight: '700',
   },
   section: {
     marginBottom: 30,
@@ -201,42 +309,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
     marginBottom: 15,
-  },
-
-  // --- Styles cho thẻ "Thi lại" ---
-  mainRetryCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 24,
-    padding: 20,
-    overflow: 'hidden', // Quan trọng để cắt các mảng trang trí góc
-    position: 'relative',
-  },
-  retryCardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  retryCardBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  previousScoreText: {
-    fontSize: 14,
-    color: COLORS.textGray,
-    fontWeight: '600',
-  },
-  retryButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-  },
-  retryButtonText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 12,
   },
 
   // --- Styles chung cho Icon Container ---
@@ -270,6 +342,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
   },
+  premiumBadgeText: {
+    fontSize: 10,
+    color: COLORS.primaryGreen,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  examMeta: {
+    fontSize: 11,
+    color: COLORS.textGray,
+    marginTop: 4,
+  },
 
   // --- Styles cho thẻ "Nổi bật" ---
   featuredCard: {
@@ -281,10 +364,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     position: 'relative',
-    height: 80,
+    minHeight: 80,
   },
 
-  // --- Styles cho Grid "Cấp độ" ---
+  // --- Styles cho Grid "Tất cả đề thi" ---
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -292,15 +375,25 @@ const styles = StyleSheet.create({
   },
   levelCard: {
     width: (width - 40 - 15) / 2, // (Màn hình - padding 2 bên - khoảng cách giữa 2 thẻ) / 2
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     backgroundColor: COLORS.cardBg,
     borderRadius: 20,
     padding: 16,
     marginBottom: 15,
     overflow: 'hidden',
     position: 'relative',
-    height: 76,
+    minHeight: 120,
+  },
+
+  // --- Empty State ---
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textGray,
   },
 
   // --- Decorative Shapes (Mảng trang trí góc) ---

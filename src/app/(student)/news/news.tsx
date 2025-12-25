@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Platform, Alert, Dimensions, ActivityIndicator, RefreshControl } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import { StackNavigationProp } from '@react-navigation/stack'
+import { useRouter } from 'expo-router'
 import { spacing } from '../../../theme/spacing'
 import { colors, palette } from '../../../theme/colors'
 
-import { RootStackParamList } from '../../../types/navigation'
 import { useNews } from '../../../hooks/useNews'
 import { NewsArticle as ApiNewsArticle, formatNewsDate, getDifficultyColor, getDifficultyText } from '../../../services/newsApiService'
 import { useFavoriteNews } from '../../../contexts/FavoriteNewsContext'
 
-type StdNewsNavigationProp = StackNavigationProp<RootStackParamList>;
-
 const { width: screenWidth } = Dimensions.get('window');
 
 const StdNews: React.FC = () => {
-  const navigation = useNavigation<StdNewsNavigationProp>()
+  const router = useRouter()
   const { favoriteNews } = useFavoriteNews()
   const [selectedFilter, setSelectedFilter] = useState('All')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -330,9 +326,12 @@ const StdNews: React.FC = () => {
   const NewsItem = ({ item }: { item: ApiNewsArticle }) => (
     <TouchableOpacity 
       style={styles.newsCard}
-      onPress={() => navigation.navigate('NewsDetail', { 
-        newsId: item.id, 
-        title: item.title 
+      onPress={() => router.push({
+        pathname: '/(student)/news-detail',
+        params: {
+          newsId: item.id, 
+          title: item.title 
+        }
       })}
     >
       <Image source={{ uri: item.imageUrl }} style={styles.newsImage} />
