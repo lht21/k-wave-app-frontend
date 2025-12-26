@@ -11,6 +11,39 @@ export interface Question {
   explanation: string;
 }
 
+export interface ReadingExercise {
+  _id: string;
+  title: string;
+  content: string;
+  questions: {
+    _id: string;
+    question: string;
+    options: string[]; // Backend lưu mảng string ["A", "B"]
+    // answer: number (Ẩn hoặc hiện tùy logic)
+  }[];
+}
+
+export interface ReadingResultDetail {
+    questionId: string;
+    userAnswer: number;
+    correctAnswer: number;
+    isCorrect: boolean;
+    explanation: string;
+}
+
+export interface ReadingSubmissionResponse {
+    success: boolean;
+    data: {
+        score: number;
+        correctCount: number;
+        totalQuestions: number;
+        results: ReadingResultDetail[];
+        passed: boolean;
+    };
+}
+
+
+
 export interface Reading {
   _id?: string;
   title: string;
@@ -122,16 +155,32 @@ async getReadingsByLesson(lessonId: string): Promise<{ success: boolean; reading
   }
 
   // POST: Nộp bài làm
-  async submitReading(id: string, answers: { questionId: string; selectedAnswer: number }[]) {
-    return this.fetchWithAuth<{
-      score: number;
-      correctCount: number;
-      totalQuestions: number;
-      results: any[];
-    }>(`${API_BASE_URL}/readings/${id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({ answers }),
-    });
+  async submitReading(
+      readingId: string, 
+      lessonId: string, 
+      answers: Record<string, number>
+  ): Promise<ReadingSubmissionResponse> {
+      try {
+          if (!readingId || !lessonId) throw new Error("Missing ID");
+
+          const token = await authService.getToken();
+          const response = await fetch(`${API_BASE_URL}/readings/${readingId}/submit`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ lessonId, answers }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || 'Submission failed');
+          
+          return data;
+      } catch (error) {
+          console.error('Submit reading error:', error);
+          throw error;
+      }
   }
 
   // GET: Thống kê

@@ -65,7 +65,7 @@ export default function StdLearn() {
   const loadLessons = async () => {
       try {
           setIsLoading(true);
-          const response = await lessonService.getLessons({ level: currentLevel });
+          const response = await lessonService.getLessonsForStudent({ level: currentLevel });
           setLessons(response.lessons);
       } catch (error: any) {
           console.error('Error loading lessons:', error);

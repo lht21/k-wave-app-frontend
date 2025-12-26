@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
  
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { XIcon, CheckIcon } from 'phosphor-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ReadingExercise, readingService } from '../../../../services/readingService';
+import { ActivityIndicator } from 'react-native-paper';
 
-const { width } = Dimensions.get('window');
 
 const COLORS = {
   primaryGreen: '#00C853',
@@ -25,49 +27,93 @@ const COLORS = {
 };
 
 // --- Component 1: Một câu hỏi ---
-const QuestionItem = ({ qIndex, question, options, selectedId, onSelect }: any) => {
+const QuestionItem = ({ qIndex, question, options, selectedIndex, onSelect, result }: any) => {
   return (
     <View style={styles.questionContainer}>
       <Text style={styles.questionText}>Câu {qIndex}: {question}</Text>
       
-      {options.map((option: any) => {
-        const isSelected = selectedId === option.id;
+      {/* SỬA 1: Map qua mảng string, dùng index làm key */}
+      {options.map((optionText: string, index: number) => {
+        const isSelected = selectedIndex === index;
+        
+        // Logic tô màu kết quả (Chấm điểm)
+        let itemStyle = styles.optionItem;
+        let textStyle = styles.optionLabel;
+
+        if (result) {
+            // Nếu đây là đáp án ĐÚNG (theo server)
+            if (result.correctAnswer === index) {
+                itemStyle = { ...styles.optionItem, backgroundColor: '#C8E6C9', borderColor: '#00C853', borderWidth: 1 };
+            }
+            // Nếu user chọn SAI
+            if (isSelected && !result.isCorrect) {
+                itemStyle = { ...styles.optionItem, backgroundColor: '#FFCDD2', borderColor: '#F44336', borderWidth: 1 };
+            }
+        } else if (isSelected) {
+            // Trạng thái đang chọn (chưa nộp)
+            itemStyle = { ...styles.optionItem, borderColor: COLORS.primaryGreen, borderWidth: 1, backgroundColor: '#E8F5E9' };
+        }
+
         return (
           <TouchableOpacity
-            key={option.id}
-            style={styles.optionItem}
+            key={index} // Dùng index làm key vì options là mảng string
+            style={itemStyle}
             activeOpacity={0.7}
-            onPress={() => onSelect(option.id)}
+            // SỬA 2: Truyền index thay vì option.id
+            onPress={() => !result && onSelect(index)}
+            disabled={!!result} // Khóa không cho chọn lại khi đã có kết quả
           >
             <View style={[styles.radioButton, isSelected && styles.radioActive]}>
               {isSelected && <View style={styles.radioInner} />}
             </View>
-            <Text style={styles.optionLabel}>{option.text}</Text>
+            {/* SỬA 3: Hiển thị trực tiếp optionText */}
+            <Text style={textStyle}>{optionText}</Text>
           </TouchableOpacity>
         );
       })}
+      
+      {/* Hiển thị giải thích nếu sai */}
+      {result && !result.isCorrect && (
+           <Text style={{color: '#F44336', marginTop: 8, fontStyle: 'italic', fontSize: 13}}>
+               👉 Đáp án đúng: {options[result.correctAnswer]}
+           </Text>
+      )}
     </View>
   );
 };
-
 // --- Component 2: Một bài đọc (Passage + Questions) ---
-const ReadingSection = ({ section, answers, onAnswerSelect }: any) => {
+const ReadingSection = ({ section, answers, onAnswerSelect, sectionResult }: any) => {
   return (
     <View style={styles.sectionContainer}>
-      <Text style={styles.sectionTitle}>Bài {section.id}: {section.title}</Text>
+      {/* Dùng section.title thay vì _id cho đẹp */}
+      <Text style={styles.sectionTitle}>{section.title}</Text>
       <Text style={styles.passageContent}>{section.content}</Text>
+      
+      {/* Hiển thị bản dịch nếu cần (Optional) */}
+      {section.translation && (
+        <Text style={{fontSize: 14, color: '#666', fontStyle: 'italic', marginBottom: 15}}>
+            {section.translation}
+        </Text>
+      )}
 
       <Text style={styles.subLabel}>Câu hỏi:</Text>
-      {section.questions.map((q: any, idx: number) => (
-        <QuestionItem
-          key={q.id}
-          qIndex={idx + 1}
-          question={q.text}
-          options={q.options}
-          selectedId={answers[q.id]}
-          onSelect={(optionId: string) => onAnswerSelect(q.id, optionId)}
-        />
-      ))}
+      {section.questions.map((q: any, idx: number) => {
+        // --- SỬA LỖI TẠI ĐÂY ---
+        // Thêm ?. trước .find
+        const qResult = sectionResult?.results?.find((r: any) => r.questionId.toString() === q._id.toString());
+        
+        return (
+            <QuestionItem
+              key={q._id}
+              qIndex={idx + 1}
+              question={q.question}
+              options={q.options}
+              selectedIndex={answers[q._id]}
+              onSelect={(index: number) => onAnswerSelect(q._id, index)}
+              result={qResult}
+            />
+        );
+      })}
     </View>
   );
 };
@@ -75,65 +121,104 @@ const ReadingSection = ({ section, answers, onAnswerSelect }: any) => {
 // --- Màn hình chính ---
 export default function ReadingExerciseScreen() {
   const router = useRouter();
-  const [answers, setAnswers] = useState<any>({});
+  const { id } = useLocalSearchParams();
+  
+  const [readings, setReadings] = useState<ReadingExercise[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data theo hình ảnh thiết kế
-  const mockData = [
-    {
-      id: 1,
-      title: 'Gia đình của tôi',
-      content: '우리 가족은 네 명입니다. 아버지, 어머니, 형, 그리고 저입니다. 아버지는 의사입니다. 어머니는 선생님입니다.',
-      questions: [
-        {
-          id: 'q1_1',
-          text: 'Gia đình có mấy người?',
-          options: [
-            { id: 'a', text: '2 người' },
-            { id: 'b', text: '3 người' },
-            { id: 'c', text: '4 người' },
-            { id: 'd', text: '5 người' },
-          ]
-        },
-        {
-          id: 'q1_2',
-          text: 'Bố làm nghề gì?',
-          options: [
-            { id: 'a', text: 'Bác sĩ' },
-            { id: 'b', text: 'Giáo viên' },
-          ]
-        }
-      ]
-    },
-    {
-      id: 2,
-      title: 'Gia đình của tôi',
-      content: '우리 가족은 네 명입니다. 아버지, 어머니, 형, 그리고 저입니다. 아버지는 의사입니다. 어머니는 선생님입니다.',
-      questions: [
-        {
-          id: 'q1_1',
-          text: 'Gia đình có mấy người?',
-          options: [
-            { id: 'a', text: '2 người' },
-            { id: 'b', text: '3 người' },
-            { id: 'c', text: '4 người' },
-            { id: 'd', text: '5 người' },
-          ]
-        },
-        {
-          id: 'q1_2',
-          text: 'Bố làm nghề gì?',
-          options: [
-            { id: 'a', text: 'Bác sĩ' },
-            { id: 'b', text: 'Giáo viên' },
-          ]
-        }
-      ]
-    }
-  ];
+  // State lưu đáp án: { "questionId": 0, "questionId2": 1 }
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  
+  // State lưu kết quả sau khi chấm: { "readingId": { score: 80, results: [...] } }
+  const [results, setResults] = useState<Record<string, any>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSelect = (qId: string, optionId: string) => {
-    setAnswers({ ...answers, [qId]: optionId });
+  // 1. Fetch dữ liệu khi vào màn hình
+  useEffect(() => {
+    const fetchReadings = async () => {
+      try {
+        const lessonId = Array.isArray(id) ? id[0] : id;
+        if (lessonId) {
+            const data = await readingService.getReadingsByLesson(lessonId);
+            setReadings(data.readings || []);
+        }
+      } catch (error) {
+        Alert.alert("Lỗi", "Không thể tải bài tập đọc.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReadings();
+  }, [id]);
+
+
+  // 2. Xử lý chọn đáp án (Lưu index)
+  const handleSelect = (qId: string, optionIndex: number) => {
+    setAnswers({ ...answers, [qId]: optionIndex });
   };
+
+  // 3. Xử lý Nộp bài
+  const handleSubmit = async () => {
+    try {
+        setSubmitting(true);
+        const lessonId = Array.isArray(id) ? id[0] : id;
+        
+        let newResults = {};
+        let totalScore = 0;
+        let answeredCount = 0;
+
+        // Duyệt qua từng bài đọc
+        for (const reading of readings) {
+            const readingAnswers: Record<string, number> = {};
+            
+            // Lọc answers thuộc về bài đọc này
+            reading.questions.forEach(q => {
+                if (answers[q._id] !== undefined) {
+                    readingAnswers[q._id] = answers[q._id];
+                }
+            });
+
+            // Chỉ nộp nếu user có làm bài này
+            if (Object.keys(readingAnswers).length > 0) {
+                answeredCount++;
+                const response = await readingService.submitReading(
+                    reading._id, 
+                    lessonId!, 
+                    readingAnswers
+                );
+
+                // ✅ SỬA: Lấy dữ liệu từ thuộc tính .data
+                // Backend trả về: { success: true, data: { score: 10, results: [...] } }
+                const resultData = response.data; 
+
+                // Kiểm tra an toàn trước khi cộng điểm
+                if (resultData) {
+                    // Lưu kết quả theo readingId
+                    newResults = { ...newResults, [reading._id]: resultData }; 
+                    totalScore += resultData.score;
+                }
+            }
+        }
+
+        if (answeredCount === 0) {
+            Alert.alert("Thông báo", "Bạn chưa làm câu nào cả!");
+            setSubmitting(false);
+            return;
+        }
+
+        setResults(newResults);
+        
+        const avgScore = Math.round(totalScore / answeredCount);
+        Alert.alert("Kết quả", `Điểm trung bình: ${avgScore}/100`);
+
+    } catch (error) {
+        Alert.alert("Lỗi", "Có lỗi xảy ra khi nộp bài.");
+    } finally {
+        setSubmitting(false);
+    }
+  };
+
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primaryGreen} /></View>;
 
   return (
     <View style={styles.container}>
@@ -151,27 +236,44 @@ export default function ReadingExerciseScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollPadding}>
-        {mockData.map((section) => (
-          <ReadingSection 
-            key={section.id} 
-            section={section} 
-            answers={answers}
-            onAnswerSelect={handleSelect}
-          />
-        ))}
+        {readings.length === 0 ? (
+            <Text style={{textAlign: 'center', marginTop: 20}}>Không có bài đọc nào.</Text>
+        ) : (
+            (readings || []).map((section) => (
+            <ReadingSection 
+                key={section._id} 
+                section={section} 
+                answers={answers}
+                onAnswerSelect={handleSelect}
+                sectionResult={results[section._id]} // Truyền kết quả xuống
+            />
+            ))
+        )}
       </ScrollView>
 
-      {/* Footer Nộp bài */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.submitBtn} activeOpacity={0.8}>
-          <Text style={styles.submitBtnText}>Nộp bài</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Footer Nộp bài (Chỉ hiện khi chưa có kết quả) */}
+      {Object.keys(results).length === 0 && readings.length > 0 && (
+        <View style={styles.footer}>
+            <TouchableOpacity 
+                style={[styles.submitBtn, submitting && {opacity: 0.7}]} 
+                activeOpacity={0.8}
+                onPress={handleSubmit}
+                disabled={submitting}
+            >
+            {submitting ? (
+                <ActivityIndicator color={COLORS.white} />
+            ) : (
+                <Text style={styles.submitBtnText}>Nộp bài</Text>
+            )}
+            </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: COLORS.white },
   header: { backgroundColor: COLORS.primaryGreen, paddingBottom: 20 },
   headerContent: { 

@@ -142,7 +142,7 @@ export default function WritingExerciseScreen() {
         const lessonId = Array.isArray(id) ? id[0] : id;
         if (lessonId) {
           const data = await writingService.getWritingsByLesson(lessonId);
-          setWritings(data || []);
+          setWritings(data.writings || []);
         }
       } catch (error) {
         console.error(error);
