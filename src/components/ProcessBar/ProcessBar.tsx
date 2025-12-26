@@ -1,19 +1,37 @@
-import { Text, View } from "react-native";
-import { StyleSheet } from "react-native";
-import { palette } from "../../theme/colors";
+// file: ProcessBar.tsx (hoặc đường dẫn thực tế của bạn)
+import React from "react";
+import { Text, View, StyleSheet } from "react-native";
+// Giả sử palette được import từ theme, nếu không bạn có thể dùng mã màu trực tiếp
+import { palette } from "../../theme/colors"; 
 
-export default function ProcessBar({ percent = 0 }: { percent: number }) {
+interface ProcessBarProps {
+  percent?: number;
+  label?: string; // Thêm prop label
+  color?: string; // Thêm prop color để tùy biến màu nếu muốn
+}
+
+export default function ProcessBar({ 
+  percent = 0, 
+  label = "Tiến độ", 
+  color = palette.primary || '#00C853' 
+}: ProcessBarProps) {
+  // Đảm bảo percent không vượt quá 100
+  const safePercent = Math.min(100, Math.max(0, percent));
+
   return (
     <View style={styles.progressContainer}>
         <View style={styles.progressLabelRow}>
-            <Text style={styles.progressLabel}>Tiến độ học từ vựng của bài này</Text>
-            <Text style={styles.progressPercent}>{percent}%</Text>
+            <Text style={styles.progressLabel}>{label}</Text>
+            <Text style={[styles.progressPercent, { color: color }]}>{safePercent}%</Text>
         </View>
         <View style={styles.progressBarBackground}>
         <View 
             style={[
             styles.progressBarFill, 
-            { width: `${percent}%` } // Chiều rộng động dựa trên %
+            { 
+              width: `${safePercent}%`,
+              backgroundColor: color 
+            } 
             ]} 
         />
         </View>
@@ -23,32 +41,30 @@ export default function ProcessBar({ percent = 0 }: { percent: number }) {
 
 const styles = StyleSheet.create({
   progressContainer: {
-    marginBottom: 20, // Cách các phần khác một chút
+    marginBottom: 12, // Giảm margin một chút để gọn hơn trong Grid
   },
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 14,
+    fontSize: 13, // Giảm font size một chút cho gọn
     fontWeight: '600',
-    color: palette.black,
+    color: '#1A1A1A',
   },
   progressPercent: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: palette.primary,
   },
   progressBarBackground: {
-    height: 10, // Độ dày thanh
-    backgroundColor: '#E0E0E0', // Màu nền xám (track)
-    borderRadius: 5,
-    overflow: 'hidden', // Để bo tròn cả thanh màu bên trong
+    height: 8, 
+    backgroundColor: '#E0E0E0', 
+    borderRadius: 4,
+    overflow: 'hidden', 
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: palette.primary, // Màu xanh (fill)
-    borderRadius: 5,
+    borderRadius: 4,
   },
-})
+});
