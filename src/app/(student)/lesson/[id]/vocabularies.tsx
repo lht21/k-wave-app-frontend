@@ -166,7 +166,7 @@ export default function ListVocabularyScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-          <ProcessBar percent={vocabularyProgress} />
+          <ProcessBar label='Tiến trình học từ vựng của bài học này' percent={vocabularyProgress} color={palette.primary} />
           
           {/* Section: Thống kê (Stat Cards) */}
           <View style={styles.statsRow}>

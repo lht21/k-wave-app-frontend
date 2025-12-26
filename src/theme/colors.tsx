@@ -1,3 +1,5 @@
+import { red } from "react-native-reanimated/lib/typescript/Colors";
+
 export const palette = {
     primary: '#00C853',
     secondary: '#A1BC98', 
@@ -21,6 +23,8 @@ export const palette = {
     warning: '#FFA000',
     success: '#388E3C',
     info: '#1976D2',
+    red: '#D32F2F',
+    teal: '#009688',
 
     statBlue: '#C5D8FF',
     statOrange: '#FFCC91',
